@@ -24,11 +24,12 @@
 ```
 PLAN.md
 README.md
-backend/CMakeLists.txt
-backend/src/main.cpp
-backend/src/moon_ephemeris.h
-backend/src/moon_ephemeris.cpp
-frontend/          # Vite + React + TypeScript
+src/backend/CMakeLists.txt
+src/backend/src/main.cpp
+src/backend/src/moon_ephemeris.h
+src/backend/src/moon_ephemeris.cpp
+src/frontend/      # Vite + React + TypeScript
+docker/            # nginx + container entrypoint (see Dockerfile)
 ```
 
 ## API (sketch)
@@ -39,7 +40,7 @@ frontend/          # Vite + React + TypeScript
 
 ## Astronomy approach
 
-Low-precision Sun/Moon models suitable for UI (based on widely used public formulas; see source comments in `moon_ephemeris.cpp`). Not intended for mission-critical navigation.
+Low-precision Sun/Moon models suitable for UI (based on widely used public formulas; see source comments in `src/backend/src/moon_ephemeris.cpp`). Not intended for mission-critical navigation.
 
 ## Build and run
 

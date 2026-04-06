@@ -42,7 +42,7 @@
 
 # Node / frontend
 node_modules/
-frontend/dist/
+src/frontend/dist/
 *.log
 npm-debug.log*
 

@@ -85,8 +85,9 @@ int main(int argc, char** argv) {
     const auto date_it = req.params.find("date");
     if (lat_it == req.params.end() || lon_it == req.params.end() || date_it == req.params.end()) {
       res.status = 400;
+      // Custom delimiter: R"(...)" breaks — `12:00)"` terminates the raw string early.
       res.set_content(
-          R"({"error":"required query params: lat, lon, date (YYYY-MM-DD); optional: time (HH:MM UTC, default 12:00)"})",
+          R"ERR({"error":"required query params: lat, lon, date (YYYY-MM-DD); optional: time (HH:MM UTC, default 12:00)"})ERR",
           "application/json");
       set_cors(res);
       return;

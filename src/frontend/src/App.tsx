@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import "./App.css";
 import { fetchMoon, type MoonApiResponse } from "./api";
+import { formatUtcIsoInZone, getPrimaryTimeZone } from "./locationTime";
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
@@ -21,6 +22,18 @@ export default function App() {
   const canSubmit = useMemo(() => {
     return lat.trim() !== "" && lon.trim() !== "" && date.trim() !== "";
   }, [lat, lon, date]);
+
+  const coords = useMemo(() => {
+    const la = Number(lat);
+    const lo = Number(lon);
+    if (!Number.isFinite(la) || !Number.isFinite(lo)) return null;
+    return { lat: la, lon: lo };
+  }, [lat, lon]);
+
+  const locationTimeZone = useMemo(
+    () => (coords ? getPrimaryTimeZone(coords.lat, coords.lon) : null),
+    [coords],
+  );
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,8 +59,9 @@ export default function App() {
     <div className="app">
       <h1>Moon tracker</h1>
       <p className="subtitle">
-        Phase, illumination, and moonrise/moonset for a place and date. Times use UTC unless noted; the API uses UTC
-        for the selected instant and for rise/set on the UTC calendar day.
+        Phase, illumination, and moonrise/moonset for a place and date. Enter the observation time in <strong>UTC</strong>.
+        Results show <strong>local time at your coordinates</strong> (IANA timezone from a geographic lookup), with UTC in
+        smaller text. The API still computes in UTC.
       </p>
 
       <form className="card" onSubmit={onSubmit}>
@@ -74,7 +88,16 @@ export default function App() {
         <button type="submit" disabled={!canSubmit || loading}>
           {loading ? "Computing…" : "Compute"}
         </button>
-        {error ? <div className="error">{error}</div> : null}
+        {!canSubmit ? (
+          <p className="muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+            Fill in latitude, longitude, and date to compute.
+          </p>
+        ) : null}
+        {error ? (
+          <div className="error" role="alert">
+            {error}
+          </div>
+        ) : null}
       </form>
 
       {data ? (
@@ -84,28 +107,77 @@ export default function App() {
             <p>
               <strong>{data.phase.name}</strong>
             </p>
-            <p className="muted">Cycle fraction: {data.phase.cycle_fraction.toFixed(4)}</p>
-            <p className="muted">Sun–Moon–Earth angle: {data.phase.sun_moon_earth_angle_deg.toFixed(2)}°</p>
+            <p className="muted">
+              Cycle fraction:{" "}
+              {typeof data.phase.cycle_fraction === "number"
+                ? data.phase.cycle_fraction.toFixed(4)
+                : "—"}
+            </p>
+            <p className="muted">
+              Sun–Moon–Earth angle:{" "}
+              {typeof data.phase.sun_moon_earth_angle_deg === "number"
+                ? `${data.phase.sun_moon_earth_angle_deg.toFixed(2)}°`
+                : "—"}
+            </p>
           </div>
           <div className="result-item">
             <h3>Illumination</h3>
             <p>
-              <strong>{data.illumination.percent.toFixed(1)}%</strong> lit
+              <strong>
+                {typeof data.illumination.percent === "number"
+                  ? `${data.illumination.percent.toFixed(1)}%`
+                  : "—"}
+              </strong>{" "}
+              lit
             </p>
-            <p className="muted">Instant (UTC): {data.instant_utc}</p>
+            {locationTimeZone ? (
+              <>
+                <p>
+                  Instant (local): <strong>{formatUtcIsoInZone(data.instant_utc, locationTimeZone)}</strong>
+                </p>
+                <p className="muted">Instant (UTC): {data.instant_utc}</p>
+              </>
+            ) : (
+              <p className="muted">Instant (UTC): {data.instant_utc}</p>
+            )}
           </div>
           <div className="result-item">
-            <h3>Visibility (UTC day)</h3>
+            <h3>Visibility</h3>
+            {locationTimeZone ? (
+              <p className="muted" style={{ marginTop: 0 }}>
+                Timezone: <code>{locationTimeZone}</code>. Rise/set from the API use the UTC calendar day of your selected
+                date.
+              </p>
+            ) : (
+              <p className="muted" style={{ marginTop: 0 }}>
+                No timezone found for these coordinates; showing UTC only.
+              </p>
+            )}
             {data.visibility.state === "normal" ? (
               <>
                 {data.visibility.moonrise_utc ? (
                   <p>
-                    Moonrise: <strong>{data.visibility.moonrise_utc}</strong>
+                    Moonrise (local):{" "}
+                    <strong>
+                      {locationTimeZone
+                        ? formatUtcIsoInZone(data.visibility.moonrise_utc, locationTimeZone)
+                        : data.visibility.moonrise_utc}
+                    </strong>
                   </p>
                 ) : null}
                 {data.visibility.moonset_utc ? (
                   <p>
-                    Moonset: <strong>{data.visibility.moonset_utc}</strong>
+                    Moonset (local):{" "}
+                    <strong>
+                      {locationTimeZone
+                        ? formatUtcIsoInZone(data.visibility.moonset_utc, locationTimeZone)
+                        : data.visibility.moonset_utc}
+                    </strong>
+                  </p>
+                ) : null}
+                {(data.visibility.moonrise_utc || data.visibility.moonset_utc) && locationTimeZone ? (
+                  <p className="muted">
+                    UTC: moonrise {data.visibility.moonrise_utc ?? "—"}, moonset {data.visibility.moonset_utc ?? "—"}
                   </p>
                 ) : null}
                 {typeof data.visibility.hours_above_horizon === "number" ? (
@@ -117,7 +189,6 @@ export default function App() {
             ) : (
               <p>Moon continuously below horizon that day.</p>
             )}
-            <p className="muted">Rise/set are computed for the UTC calendar day of the selected date.</p>
           </div>
         </div>
       ) : null}

@@ -1,0 +1,9 @@
+.git
+build
+cmake-build-*
+src/frontend/node_modules
+src/frontend/dist
+**/*.o
+**/.DS_Store
+.cursor
+*.log
