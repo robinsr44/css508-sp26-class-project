@@ -214,67 +214,124 @@ Assumes dev server and API are both up.
 
 **End-to-end (E2E) tests** exercise the **real browser**: load the SPA, interact with the DOM, and assert visible outcomes. They require **moon-api** (and optionally **Vite** or **Docker/nginx**) running—same stack a developer would use locally. Typical tools: **Playwright**, **Cypress**, or **Selenium**.
 
+E2E is best for **user-visible behavior** and **cross-layer wiring** (UI → HTTP → UI). It is a poor place to assert **astronomy correctness** or **every API error string**; keep those in **unit** and **integration** tests so E2E stays stable and fast.
+
+---
+
+#### Tooling (typical choices)
+
+- **Playwright**: strong CI story, trace viewer, multi-browser projects, `page.request` for API checks without the UI, auto-waiting locators.
+- **Cypress**: strong local DX; often one browser per run unless using cross-browser add-ons.
+- **Selenium**: widely used; heavier setup.
+
+Regardless of tool, configure a **single base URL** (e.g. `PLAYWRIGHT_BASE_URL`, Cypress `baseUrl`) so the same tests run against **Vite**, **Docker**, or a **preview** URL without code changes.
+
 ---
 
 #### Preconditions (fixtures)
 
 - **Dev-style E2E**: Start **`moon-api`** on **8080**, then **`npm run dev`** in [`src/frontend`](src/frontend) (Vite proxies [`/api`](src/frontend/vite.config.ts) to the API). Base URL: `http://127.0.0.1:5173` (or the port Vite prints).
 - **Production-style E2E**: Run **`docker compose up --build`** and point tests at the mapped **HTTP** port (nginx serves UI + proxies `/api`).
-- Tests should **wait** for network idle or for result selectors after click (avoid flaky timing).
+- **CI**: Automate startup—e.g. Playwright **`webServer`** (start Vite + `moon-api` via a script), or a shell script that waits for **`GET /api/health`** before tests. Use **`strictPort: true`** in Vite (or a fixed port) so the base URL does not drift when 5173 is busy.
+- **Order**: Start **API** → **frontend** → **tests**; tear down in reverse.
+
+---
+
+#### Waiting, flakiness, and assertions
+
+- Prefer **locator auto-wait** over fixed sleeps.
+- After **Compute**, wait for a **stable success signal**: e.g. `getByRole('heading', { name: 'Phase' })` inside `.result-grid`, not bare **`networkidle`** (SPAs often keep connections open).
+- **“Computing…”** is **optional** to assert—on fast CI the loading state may never be visible; if you assert it, use a short window or run that check only in serial mode.
+- Use **soft assertions** only for nice-to-haves; **hard assert** on core outcomes (results visible, no unexpected **console** errors if you enable that guard).
 
 ---
 
 #### Smoke / happy path — [`App.tsx`](src/frontend/src/App.tsx)
 
-- Navigate to the app → page title or **`h1`** contains **Moon tracker** (or matches [`index.html`](src/frontend/index.html) `<title>`).
-- **Form controls** are present and labeled: `#lat`, `#lon`, `#date`, `#time` (see `htmlFor` / `id` in [`App.tsx`](src/frontend/src/App.tsx)).
-- Set **latitude**, **longitude**, **date** (use `input[type=date]` fill pattern for the runner), and **UTC time**; click **Compute** (submit button not disabled when fields are filled).
-- While the request is in flight (optional strict assertion): button text is **Computing…** or button is disabled.
-- After success: a **results** area appears (e.g. `.result-grid` or second `.card`) with headings **Phase**, **Illumination**, **Visibility**.
-- **Phase** section shows a **phase name** string (non-empty) and numeric-looking lines (cycle fraction, angle).
-- **Illumination** shows a **percent** and either **Instant (local)** / **Instant (UTC)** or UTC-only line depending on timezone resolution.
-- **Visibility** shows state-appropriate content: **normal** (moonrise/moonset lines or muted UTC lines), **always_up**, or **always_down** text for polar cases (use a coordinate/date known to trigger each branch, or accept one branch as smoke-only).
+- Navigate → **`h1`** or document title matches **Moon tracker** (see [`index.html`](src/frontend/index.html)).
+- **Form controls** exist with labels: `#lat`, `#lon`, `#date`, `#time` ([`App.tsx`](src/frontend/src/App.tsx)).
+- Fill **latitude**, **longitude**, **date**, **UTC time**; click **Compute** (button enabled when `canSubmit` is true).
+- **Date**: `input[type=date]` varies by browser and locale—use the runner’s documented fill API (e.g. `fill('2026-04-05')`). If flaky, fix **locale/timezone** in CI or add a single **`data-testid`** on the date input.
+- **Time**: some browsers emit `HH:MM` vs `HH:MM:SS`; the backend parses `HH:MM` ([`moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)). Ensure fills match what [`api.ts`](src/frontend/src/api.ts) sends in `time=`.
+- After success: **`.result-grid`** (or second **`.card`**) shows headings **Phase**, **Illumination**, **Visibility**.
+- **Phase**: non-empty phase name + visible numbers (presence over exact values).
+- **Illumination**: percent visible; at least one **instant** line (local and/or UTC) depending on `tz-lookup`.
+- **Visibility**: assert **one** realistic branch—**normal**, **always_up**, or **always_down**—using **fixed** lat/lon/date from prior experiments, or treat **one** branch as sufficient for smoke.
 
 ---
 
 #### Determinism (lightweight E2E)
 
-- Submit the **same** lat, lon, date, time twice in one session → **Phase** name (and key numbers if stable in CI) **match** between runs (same browser, same backend build).
+- Same inputs twice in one session → **phase name** (and stable numbers) match. Avoid comparing **full** localized strings if **Intl** differs across CI workers; prefer phase name + illumination percent.
 
 ---
 
 #### Client-side validation (no server round-trip)
 
-- Clear **latitude** or **longitude** to non-numeric text (e.g. `abc`) → submit → **`role="alert"`** (or `.error`) shows **Latitude and longitude must be valid numbers.** (or equivalent).
-- Leave required fields empty so **Compute** is **disabled** → assert **Fill in latitude, longitude, and date to compute.** is visible (when `canSubmit` is false).
+- Non-numeric **lat** or **lon** (e.g. `abc`) → submit → **`[role="alert"]`** shows an error; match a **substring** (e.g. “valid numbers”) so exact copy edits do not break the test.
+- **Empty fields**: To force **`canSubmit` false**, clear **lat**, **lon**, or **date**. Browsers may resist an empty **date**—use runner APIs or accept “manual / skipped” if impractical; when disabled, assert the hint **Fill in latitude, longitude, and date** appears.
 
 ---
 
 #### API unavailable / error surfacing
 
-- With the **frontend up** and **`moon-api` stopped**, fill valid inputs and click **Compute** → an error appears in **`[role="alert"]`** with text indicating **cannot reach** / **port 8080** / **proxy** (matches user-facing copy in [`api.ts`](src/frontend/src/api.ts)).
-- Optional: mock or block `/api/moon` at the network layer to force **HTTP 400** and assert the API **`error`** message appears in the alert region.
+- **Frontend up**, **`moon-api` down** → **Compute** → **`[role="alert"]`** includes keywords such as **cannot reach**, **8080**, or **proxy** (from [`api.ts`](src/frontend/src/api.ts)), not necessarily the full paragraph.
+- **Route mock** (Playwright `page.route`, Cypress `intercept`): return **400** + `{ "error": "..." }` and assert that text (or substring) appears—verifies **UI ↔ error message** without stopping the API.
 
 ---
 
-#### Accessibility (recommended E2E checks)
+#### Keyboard and focus (optional)
 
-- **`h1`** is unique; form fields have associated **labels** (`label[for=lat]` etc.).
-- On error, the message is inside **`[role="alert"]`** so assistive tech picks it up.
+- **Tab** through fields; submit with **Enter** on the focused **Compute** button (or native form submit)—catches click-only handlers.
+
+---
+
+#### Accessibility (recommended)
+
+- Unique **`h1`**; **`label[for=…]`** tied to inputs; errors in **`[role="alert"]`**.
+- Optional: **axe-core** (or built-in a11y scan) on default and error states.
+
+---
+
+#### Diagnostics and CI artifacts
+
+- **Screenshot / video / trace** on failure (Playwright trace is especially useful).
+- Optional: **HAR** or failed **network** log for `/api/moon`.
+- **Parallel runs**: isolate **ports** per worker or run E2E **serially** if all tests share one global `moon-api`.
 
 ---
 
 #### Docker / deployed URL E2E
 
-- Target **`http://localhost:<mapped-port>`** (no Vite): repeat **happy path** and **error** scenarios if you expose a way to stop only the API (otherwise skip “API down” or run against a bad port).
+- Hit **`http://localhost:<mapped-port>`** (no Vite); repeat smoke and errors if you can control API availability; otherwise rely on **mocks** for failure paths.
+
+---
+
+#### UX and non-functional (optional)
+
+- **Response time**: soft budget from click to **Phase** visible (tune generously for CI hardware).
+- **Visual regression** (screenshot baselines): optional; watch font/OS drift.
+- Align with your critique section: **UX metrics** belong here as **light** checks, not as replacements for **unit** math tests.
 
 ---
 
 #### What E2E usually does *not* replace
 
-- **Precise ephemeris values** vs NASA: too brittle; rely on **unit** golden tests for math.
-- **Every HTTP 400 variant**: better covered in **integration** API tests; E2E can sample one **400** path via UI if the UI ever exposes it (current MVP mostly validates client-side and generic API errors).
+- **Precise ephemeris** vs almanacs → **unit** goldens.
+- **Every HTTP 400** → **integration** API tests; E2E samples **one** server-driven error if the UI shows it.
+- **Domain logic** that you find yourself re-encoding in E2E → move **down** the pyramid.
 
 ---
 
-*Implement with stable **`data-testid`** attributes only if selectors are flaky; prefer visible text and roles aligned with [`App.tsx`](src/frontend/src/App.tsx) and [`App.css`](src/frontend/src/App.css).*
+#### Selectors and file layout
+
+- Prefer **roles** and **visible text**; add **`data-testid`** only when unstable (date input) or **ARIA** is missing.
+- Example split: **`e2e/smoke.spec`** (happy path), **`e2e/validation.spec`** (bad numbers), **`e2e/errors.spec`** (down API or mocked 400), **`e2e/a11y.spec`** (optional).
+
+
+## Critque of AI Selected Tests
+The AI did a thorough job of creating test cases at a depth that I would not have been able to create at this speed a limited understanding of all of the components. There are a few things that I would like to make sure are met, that the tests are catching failures at the correct level of testing. What I mean is that we should not be catching logic level failures during E2E testing.
+
+At the unit test level, I would include the tests described by the AI, but I would also ensure that I am testing a robust set of inputs. I'd ensure that I cover edge cases as well as nominal operating values. An edge case example would be like, inputting the local time of 2:30am on spring daylight savings. It could also be looking at an edge for when the the phases of the moon change.
+
+At the E2E level, I'd also check that the overall behavior of the user experience capture, so creating metrics for user experience, which could include response time, color rendering, layout coherance, and usability. These are all on top of the functionality that the E2E testing described by the AI also includes.
