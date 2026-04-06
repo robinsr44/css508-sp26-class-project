@@ -39,3 +39,15 @@
 
 # debug information files
 *.dwo
+
+# Node / frontend
+node_modules/
+src/frontend/dist/
+*.log
+npm-debug.log*
+
+# CMake
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
