@@ -20,6 +20,10 @@ COPY src/backend/ ./backend/
 RUN cmake -S backend -B build -DCMAKE_BUILD_TYPE=Release \
     && cmake --build build -j"$(nproc)"
 
+# Runs moon_ephemeris_tests and moon_api_tests during `docker build --target test-backend`.
+FROM backend-build AS test-backend
+RUN ctest --test-dir /src/build --output-on-failure
+
 FROM node:20-bookworm-slim AS frontend-build
 
 WORKDIR /app
@@ -31,6 +35,19 @@ RUN npm install
 COPY src/frontend/ ./
 
 RUN npm run build
+
+# Runs Vitest during `docker build --target test-frontend`.
+FROM node:20-bookworm-slim AS test-frontend
+
+WORKDIR /app
+
+COPY src/frontend/package.json ./
+
+RUN npm install
+
+COPY src/frontend/ ./
+
+RUN npm test
 
 FROM ubuntu:22.04 AS runtime
 

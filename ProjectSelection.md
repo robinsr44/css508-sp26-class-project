@@ -2,7 +2,7 @@
 
 ## Chosen project - Moon Tracker
 
-The project is a simple Moon Tracker project. I have a personal interest in the cosmos and it feels timely given the Artemis II launch to the moon. The goal of this project is create a project with an interactive frontend (webpage), a backend (call to server), and the ability to run in CI. Additionally, the prject can be used as for learning for about software testing and using AI tools as an "AI-native".
+The project is a simple Moon Tracker project. I have a personal interest in the cosmos and it feels timely given the Artemis II launch to the moon. The goal of this project is create a project with an interactive frontend (webpage), a backend (call to server), and the ability to run in CI. Additionally, the project can be used for learning about software testing and using AI tools as an "AI-native" workflow.
 
 It is a simple project that features the following components:
 - An interactive web page frontend
@@ -18,11 +18,27 @@ The project can be split into natural test layers:
 - Integration Tests: between the frontend and backend (could also include docker)
 - E2E Testing: for the entire usage process
 
+### Implemented automated tests (current repo)
+
+The following are **in place** (GoogleTest for C++, Vitest for TypeScript):
+
+| Layer | Location |
+|--------|----------|
+| **Ephemeris** | [`src/backend/tests/moon_ephemeris_test.cpp`](src/backend/tests/moon_ephemeris_test.cpp) — Julian/unix round-trips, `parse_date` / `parse_time_hh_mm`, `iso8601_utc_from_jd`, `compute_illumination`, `moon_position`, `moon_times_for_utc_day`, `compute_full`, `sun_position` / `compute_sun_full` |
+| **HTTP API** | [`src/backend/tests/moon_api_test.cpp`](src/backend/tests/moon_api_test.cpp) — In-process [`httplib::Server`](https://github.com/yhirose/cpp-httplib) with [`register_moon_api_routes`](src/backend/src/moon_api.h); covers health, version, CORS `OPTIONS` (including `/api/health` and `/api/version`), `GET`/`POST` `/api/moon` and `/api/sun`, validation and error bodies, `POST` `date` must be a JSON string, mid-latitude visibility (`hours_above_horizon` when rise+set), polar visibility shape, GET↔POST phase parity |
+| **Frontend** | [`src/frontend/src/api.test.ts`](src/frontend/src/api.test.ts), [`locationTime.test.ts`](src/frontend/src/locationTime.test.ts), [`App.test.tsx`](src/frontend/src/App.test.tsx) — mocked `fetch`, timezone helpers, `App` smoke + **Compute** with mocked moon/sun responses |
+
+**Backend layout:** HTTP routes and JSON for moon/sun live in [`moon_api.cpp`](src/backend/src/moon_api.cpp) / [`moon_api.h`](src/backend/src/moon_api.h). [`main.cpp`](src/backend/src/main.cpp) only parses the listen port, constructs the server, and calls `register_moon_api_routes`.
+
+**Docker:** The [Dockerfile](Dockerfile) defines **`test-backend`** (runs `ctest` for ephemeris + API tests) and **`test-frontend`** (runs `npm test`). Compose services under profile **`test`** are documented in [README.md](README.md) (*Unit tests in Docker*) and [docker-compose.yml](docker-compose.yml).
+
+**Run locally:** `ctest` from the CMake build directory; `npm test` in [`src/frontend`](src/frontend). See [README.md](README.md) for backend CMake and frontend scripts.
+
 ## AI Generated Tests
 
 ### Unit Tests
 
-Below is a **text catalog** of unit tests that match the current MVP: React/TypeScript client ([`src/frontend/src/`](src/frontend/src/)), C++ ephemeris ([`src/backend/src/moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)), and HTTP wiring ([`src/backend/src/main.cpp`](src/backend/src/main.cpp)). *Pure UI layout in [`App.tsx`](src/frontend/src/App.tsx) is usually covered by component or E2E tests; only logic-level cases are listed here.*
+Below is a **text catalog** of unit-test *ideas* that align with the MVP: React/TypeScript client ([`src/frontend/src/`](src/frontend/src/)), C++ ephemeris ([`src/backend/src/moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)), and HTTP/JSON wiring ([`src/backend/src/moon_api.cpp`](src/backend/src/moon_api.cpp)). *Narrow UI layout in [`App.tsx`](src/frontend/src/App.tsx) is partly covered by [`App.test.tsx`](src/frontend/src/App.test.tsx); richer layout/E2E remains optional.*
 
 ---
 
@@ -39,13 +55,13 @@ Below is a **text catalog** of unit tests that match the current MVP: React/Type
 
 - Parses a valid UTC ISO string (e.g. `2026-04-05T12:00:00Z`) and returns a formatted string that is non-empty and different from raw UTC when using a fixed locale and a valid zone (e.g. `America/Los_Angeles`).
 - For an **unparseable** `isoUtc`, returns the input string unchanged.
-- For an **invalid** `timeZone` (if `Intl` throws `RangeError`), returns the original `isoUtc` (fallback path).
+- For **`Intl` failure** (e.g. simulated constructor throw), returns the original `isoUtc` (fallback path). Implemented tests use a mocked `Intl.DateTimeFormat` to cover this branch reliably.
 
 ---
 
 #### Frontend — [`api.ts`](src/frontend/src/api.ts) (`fetchMoon`)
 
-Use a **global `fetch` mock** (Vitest/Jest). `parseMoonJson` is private; behavior is covered by successful `fetchMoon` paths or by exporting `parseMoonJson` only under test.
+Use a **global `fetch` mock** (Vitest). `parseMoonJson` is private; behavior is covered by successful `fetchMoon` paths in [`api.test.ts`](src/frontend/src/api.test.ts), including `always_up` visibility and `fetchVersion` error paths.
 
 **Network / transport**
 
@@ -107,9 +123,9 @@ Use a **global `fetch` mock** (Vitest/Jest). `parseMoonJson` is private; behavio
 
 ---
 
-#### Backend — JSON builder behavior (via `compute_full` + [`build_json`](src/backend/src/main.cpp) or golden HTTP tests)
+#### Backend — JSON builder behavior (via `compute_full` + [`build_json`](src/backend/src/moon_api.cpp) or HTTP tests)
 
-If `build_json` stays in `main.cpp`, these are often **integration** tests; they can still be listed as **target behavior** for unit-level extraction later.
+`build_json` / `build_sun_json` live in [`moon_api.cpp`](src/backend/src/moon_api.cpp). **Shape and visibility branches** (`normal` vs `always_up` / `always_down`, `hours_above_horizon`) are covered by [`moon_api_test.cpp`](src/backend/tests/moon_api_test.cpp) against the live handler chain, not by isolating `build_json` alone.
 
 - `instant_utc` equals `YYYY-MM-DDTHH:MM:00Z` for the request’s UTC date/time.
 - `location.latitude` / `location.longitude` echo the request.
@@ -118,10 +134,10 @@ If `build_json` stays in `main.cpp`, these are often **integration** tests; they
 
 ---
 
-#### Explicitly *not* unit tests (other layers)
+#### Explicitly *not* only unit tests (other layers)
 
-- **Full HTTP server** (httplib routes, CORS): prefer **API/integration** tests hitting `GET /api/moon` and `/api/health`.
-- **React `App`**: prefer **component** tests (Testing Library) or **E2E** for “Compute” flow; optional: extract validation helpers from `onSubmit` and unit-test those.
+- **Full HTTP surface** (all routes, CORS): now also covered by **C++ `moon_api` tests** above; additional **curl/integration** or **Docker** checks remain useful for nginx and deployed URLs.
+- **React `App`**: a **component** test submits **Compute** with mocked `fetch` ([`App.test.tsx`](src/frontend/src/App.test.tsx)); fuller flows remain **E2E** (Playwright/Cypress) or manual.
 
 ---
 
@@ -157,7 +173,7 @@ Use `curl`, REST Client, or test code (`fetch`, `httplib` client, etc.) against 
 
 **`GET /api/moon` — validation errors (400)**
 
-- Missing `lat`, `lon`, or `date` → **400**, JSON `{ "error": "..." }` mentioning required params (matches [`main.cpp`](src/backend/src/main.cpp) message).
+- Missing `lat`, `lon`, or `date` → **400**, JSON `{ "error": "..." }` mentioning required params (matches [`moon_api.cpp`](src/backend/src/moon_api.cpp) messages).
 - Non-numeric `lat`/`lon` → **400**, `lat and lon must be numbers`.
 - Bad `date` format → **400**, `date must be YYYY-MM-DD`.
 - Bad `time` format → **400**, `time must be HH:MM in UTC`.
@@ -168,10 +184,11 @@ Use `curl`, REST Client, or test code (`fetch`, `httplib` client, etc.) against 
 - Valid JSON body with `lat`, `lon`, `date`, optional `time` → same **semantic result** as equivalent GET (spot-check one shared case).
 - Invalid JSON → **400** with `invalid JSON` (or documented error).
 - Missing required fields → **400** with documented `error` string.
+- **`date` not a JSON string** (e.g. numeric) → **400** with a clear `error` (see `parse_post_moon_sun_body` in [`moon_api.cpp`](src/backend/src/moon_api.cpp)).
 
 **CORS (optional but valuable for integration)**
 
-- `OPTIONS /api/moon` → **204** (or documented status) with `Access-Control-Allow-Origin` and related headers present (see [`main.cpp`](src/backend/src/main.cpp) `set_cors`).
+- `OPTIONS /api/moon`, `/api/sun`, `/api/health`, `/api/version` → **204** with `Access-Control-Allow-Origin` and related headers (see `set_cors` in [`moon_api.cpp`](src/backend/src/moon_api.cpp)); **`moon_api` unit tests** already assert several of these.
 
 ---
 
@@ -194,6 +211,7 @@ Assumes dev server and API are both up.
 
 #### Docker / nginx integration
 
+- **Unit tests in Docker:** build targets `test-backend` / `test-frontend` (Compose profile `test`) per [README.md](README.md); does not replace browser or nginx integration.
 - Build and run stack (e.g. `docker compose up --build`).
 - `GET http://localhost` (or mapped port) serves the **built frontend** (`index.html`).
 - `GET http://localhost/api/moon?...` (same host) is **proxied** to `moon-api` → **200** and valid JSON (proves [`nginx.conf`](docker/nginx.conf) `location /api/`).
@@ -329,7 +347,7 @@ Regardless of tool, configure a **single base URL** (e.g. `PLAYWRIGHT_BASE_URL`,
 - Example split: **`e2e/smoke.spec`** (happy path), **`e2e/validation.spec`** (bad numbers), **`e2e/errors.spec`** (down API or mocked 400), **`e2e/a11y.spec`** (optional).
 
 
-## Critque of AI Selected Tests
+## Critique of AI Selected Tests
 The AI did a thorough job of creating test cases at a depth that I would not have been able to create at this speed a limited understanding of all of the components. There are a few things that I would like to make sure are met, that the tests are catching failures at the correct level of testing. What I mean is that we should not be catching logic level failures during E2E testing.
 
 At the unit test level, I would include the tests described by the AI, but I would also ensure that I am testing a robust set of inputs. I'd ensure that I cover edge cases as well as nominal operating values. An edge case example would be like, inputting the local time of 2:30am on spring daylight savings. It could also be looking at an edge for when the the phases of the moon change.

@@ -48,4 +48,18 @@ std::string iso8601_utc_from_jd(double jd);
 MoonResult compute_full(int year, int month, int day, int hour_utc, int minute_utc, double lat_deg,
                         double lon_deg);
 
+struct SunHorizon {
+  double azimuth_deg{};
+  double altitude_deg{};
+};
+
+SunHorizon sun_position(double jd, double lat_deg, double lon_deg);
+
+struct SunResult {
+  SunHorizon position;
+};
+
+SunResult compute_sun_full(int year, int month, int day, int hour_utc, int minute_utc, double lat_deg,
+                           double lon_deg);
+
 }  // namespace moon

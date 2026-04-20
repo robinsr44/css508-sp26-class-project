@@ -241,4 +241,25 @@ MoonResult compute_full(int year, int month, int day, int hour_utc, int minute_u
   return r;
 }
 
+SunHorizon sun_position(double jd, double lat_deg, double lon_deg) {
+  const double lw = RAD * -lon_deg;
+  const double phi = RAD * lat_deg;
+  const double d = to_days_from_jd(jd);
+  const SunCoords c = sun_coords(d);
+  const double H = sidereal_time(d, lw) - c.ra;
+  double h = altitude(H, phi, c.dec);
+  h += astro_refraction(h);
+  const double az = azimuth(H, phi, c.dec);
+  constexpr double deg = 180.0 / PI;
+  return {az * deg, h * deg};
+}
+
+SunResult compute_sun_full(int year, int month, int day, int hour_utc, int minute_utc, double lat_deg,
+                           double lon_deg) {
+  const double jd = jd_from_utc_ymd_hms(year, month, day, hour_utc, minute_utc, 0);
+  SunResult r;
+  r.position = sun_position(jd, lat_deg, lon_deg);
+  return r;
+}
+
 }  // namespace moon

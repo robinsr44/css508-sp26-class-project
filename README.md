@@ -112,6 +112,35 @@ docker compose up --build
 
 The image builds the C++ binary, runs `npm run build` under `src/frontend`, then copies `dist/` into nginx. No separate database or env files are required.
 
+### Unit tests in Docker
+
+The [Dockerfile](Dockerfile) defines extra build targets that run the **C++** unit tests (`ctest`: `moon_ephemeris_tests`, `moon_api_tests`) and the **frontend** unit tests (`npm test` / Vitest). They are **not** part of the default app image; use the Compose **`test`** profile or build a specific target.
+
+From the **repository root**, run **both** test images (each build fails if that suite fails):
+
+```bash
+docker compose --profile test build test-backend test-frontend
+```
+
+**Only C++ tests:**
+
+```bash
+docker compose --profile test build test-backend
+```
+
+**Only frontend tests:**
+
+```bash
+docker compose --profile test build test-frontend
+```
+
+With **`docker build`** directly (same targets as in [docker-compose.yml](docker-compose.yml)):
+
+```bash
+docker build --target test-backend .
+docker build --target test-frontend .
+```
+
 ---
 
 ## Run on macOS (without Docker)
@@ -183,7 +212,7 @@ Output: **`src/frontend/dist/`**. Serving that folder is optional for local work
 
 Base path: **`/api`**. Responses are **JSON** with `Content-Type: application/json`. Errors use **400** / **500** with a body like `{"error":"..."}`.
 
-**CORS** (for browsers): `Access-Control-Allow-Origin: *`, methods `GET`, `POST`, `OPTIONS`, header `Content-Type` allowed. `OPTIONS` is defined for `/api/moon` and `/api/health`.
+**CORS** (for browsers): `Access-Control-Allow-Origin: *`, methods `GET`, `POST`, `OPTIONS`, header `Content-Type` allowed. `OPTIONS` is defined for `/api/moon`, `/api/sun`, `/api/health`, and `/api/version`.
 
 ### `GET /api/health`
 
@@ -199,6 +228,22 @@ curl -s http://127.0.0.1:8080/api/health
 
 ```json
 {"status":"ok"}
+```
+
+### `GET /api/version`
+
+Returns build metadata for the running server.
+
+**Example**
+
+```bash
+curl -s http://127.0.0.1:8080/api/version
+```
+
+**Example response**
+
+```json
+{"service":"moon-api","version":"1.1.0"}
 ```
 
 ### `GET /api/moon`
@@ -262,6 +307,43 @@ curl -s -X POST http://127.0.0.1:8080/api/moon \
 ```
 
 `visibility.state` is **`normal`**, **`always_up`**, or **`always_down`**. For `normal`, moonrise/moonset may be omitted in edge cases; `hours_above_horizon` appears when both rise and set are present.
+
+### `GET /api/sun`
+
+**Query parameters** — same as `GET /api/moon` (`lat`, `lon`, `date`, optional `time` UTC default `12:00`).
+
+Returns the **sun’s apparent azimuth and altitude** at the requested UTC instant (low-precision suncalc-style model). This does **not** include sunrise/sunset times.
+
+**Example**
+
+```bash
+curl -s "http://127.0.0.1:8080/api/sun?lat=47.6062&lon=-122.3321&date=2026-04-05&time=12:00"
+```
+
+### `POST /api/sun`
+
+**Body** (JSON): same fields as `POST /api/moon`.
+
+**Example**
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/sun \
+  -H "Content-Type: application/json" \
+  -d '{"lat":47.6062,"lon":-122.3321,"date":"2026-04-05","time":"12:00"}'
+```
+
+### Successful `GET/POST /api/sun` response shape
+
+```json
+{
+  "instant_utc": "2026-04-05T12:00:00Z",
+  "location": { "latitude": 47.6062, "longitude": -122.3321 },
+  "position": {
+    "azimuth_deg": -119.54,
+    "altitude_deg": -16.31
+  }
+}
+```
 
 ---
 
