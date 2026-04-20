@@ -112,6 +112,35 @@ docker compose up --build
 
 The image builds the C++ binary, runs `npm run build` under `src/frontend`, then copies `dist/` into nginx. No separate database or env files are required.
 
+### Unit tests in Docker
+
+The [Dockerfile](Dockerfile) defines extra build targets that run the **C++** unit tests (`ctest`: `moon_ephemeris_tests`, `moon_api_tests`) and the **frontend** unit tests (`npm test` / Vitest). They are **not** part of the default app image; use the Compose **`test`** profile or build a specific target.
+
+From the **repository root**, run **both** test images (each build fails if that suite fails):
+
+```bash
+docker compose --profile test build test-backend test-frontend
+```
+
+**Only C++ tests:**
+
+```bash
+docker compose --profile test build test-backend
+```
+
+**Only frontend tests:**
+
+```bash
+docker compose --profile test build test-frontend
+```
+
+With **`docker build`** directly (same targets as in [docker-compose.yml](docker-compose.yml)):
+
+```bash
+docker build --target test-backend .
+docker build --target test-frontend .
+```
+
 ---
 
 ## Run on macOS (without Docker)

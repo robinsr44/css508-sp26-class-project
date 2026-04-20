@@ -7,3 +7,24 @@ services:
       # Host port : container port (nginx listens on 80 inside the container)
       - "8080:80"
     restart: unless-stopped
+
+  # Unit tests run at image build time (ctest + Vitest). Build with:
+  #   docker compose --profile test build test-backend test-frontend
+  # Or only C++ or only frontend:
+  #   docker compose --profile test build test-backend
+  #   docker compose --profile test build test-frontend
+  test-backend:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test-backend
+    image: moon-tracker-test-backend:local
+
+  test-frontend:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test-frontend
+    image: moon-tracker-test-frontend:local
