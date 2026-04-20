@@ -89,6 +89,24 @@ TEST(MoonApiCors, OptionsSun) {
   EXPECT_EQ(res->status, 204);
 }
 
+// OPTIONS /api/health returns 204 and CORS headers.
+TEST(MoonApiCors, OptionsHealth) {
+  auto cli = NewClient();
+  const auto res = cli.Options("/api/health");
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->status, 204);
+  EXPECT_EQ(res->get_header_value("Access-Control-Allow-Origin"), "*");
+}
+
+// OPTIONS /api/version returns 204 and CORS headers.
+TEST(MoonApiCors, OptionsVersion) {
+  auto cli = NewClient();
+  const auto res = cli.Options("/api/version");
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->status, 204);
+  EXPECT_EQ(res->get_header_value("Access-Control-Allow-Origin"), "*");
+}
+
 // -----------------------------------------
 // ------------ GetMoon ----------------
 // -----------------------------------------
@@ -157,6 +175,38 @@ TEST(MoonApiGetMoon, Valid200Shape) {
   EXPECT_TRUE(j["visibility"].contains("state"));
 }
 
+// Normal visibility: when both moonrise and moonset are present, hours_above_horizon is included.
+TEST(MoonApiGetMoon, NormalVisibilityHoursAboveHorizonWhenRiseAndSet) {
+  auto cli = NewClient();
+  const auto res =
+      cli.Get("/api/moon?lat=47.6&lon=-122.33&date=2024-06-15&time=12:00");
+  ASSERT_TRUE(res);
+  ASSERT_EQ(res->status, 200);
+  const auto j = nlohmann::json::parse(res->body);
+  ASSERT_EQ(j["visibility"]["state"], "normal");
+  if (j["visibility"].contains("moonrise_utc") && j["visibility"].contains("moonset_utc")) {
+    EXPECT_TRUE(j["visibility"].contains("hours_above_horizon"));
+    EXPECT_TRUE(j["visibility"]["hours_above_horizon"].is_number());
+  }
+}
+
+// High latitude: visibility.state is valid; always_up / always_down responses omit rise/set and hours.
+TEST(MoonApiGetMoon, PolarVisibilityShape) {
+  auto cli = NewClient();
+  const auto res =
+      cli.Get("/api/moon?lat=89&lon=0&date=2024-01-15&time=12:00");
+  ASSERT_TRUE(res);
+  ASSERT_EQ(res->status, 200);
+  const auto j = nlohmann::json::parse(res->body);
+  const std::string st = j["visibility"]["state"].get<std::string>();
+  EXPECT_TRUE(st == "normal" || st == "always_up" || st == "always_down");
+  if (st == "always_up" || st == "always_down") {
+    EXPECT_FALSE(j["visibility"].contains("moonrise_utc"));
+    EXPECT_FALSE(j["visibility"].contains("moonset_utc"));
+    EXPECT_FALSE(j["visibility"].contains("hours_above_horizon"));
+  }
+}
+
 // -----------------------------------------
 // ------------ GetSun -----------------
 // -----------------------------------------
@@ -205,6 +255,18 @@ TEST(MoonApiPostMoon, LatLonMustBeNumbers400) {
   const auto res = cli.Post(
       "/api/moon",
       R"({"lat":"47.6","lon":-122.33,"date":"2024-06-15"})",
+      "application/json");
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->status, 400);
+  EXPECT_TRUE(JsonErrorHasMessage(res->body));
+}
+
+// POST body date must be a JSON string (not a number).
+TEST(MoonApiPostMoon, DateMustBeString400) {
+  auto cli = NewClient();
+  const auto res = cli.Post(
+      "/api/moon",
+      R"({"lat":0,"lon":0,"date":20240615})",
       "application/json");
   ASSERT_TRUE(res);
   EXPECT_EQ(res->status, 400);

@@ -154,6 +154,14 @@ bool parse_post_moon_sun_body(const httplib::Request& req, httplib::Response& re
   }
   lat = body["lat"].get<double>();
   lon = body["lon"].get<double>();
+  if (!body["date"].is_string()) {
+    res.status = 400;
+    res.set_content(
+        R"JSON({"error":"date must be a JSON string (YYYY-MM-DD)"})JSON",
+        "application/json");
+    set_cors(res);
+    return false;
+  }
   const std::string date_str = body["date"].get<std::string>();
   if (!moon::parse_date(date_str, y, m, d)) {
     res.status = 400;

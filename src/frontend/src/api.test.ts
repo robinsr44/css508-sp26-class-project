@@ -106,6 +106,24 @@ describe("fetchMoon", () => {
       fetchMoon({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
     ).rejects.toThrow(/Cannot reach the API/);
   });
+
+  it("parses always_up visibility without rise/set fields", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      jsonResponse({
+        ...validMoonBody,
+        visibility: { state: "always_up" },
+      }),
+    );
+
+    const out = await fetchMoon({
+      lat: 89,
+      lon: 0,
+      date: "2024-01-15",
+      timeUtc: "12:00",
+    });
+
+    expect(out.visibility.state).toBe("always_up");
+  });
 });
 
 describe("fetchSun", () => {
@@ -179,5 +197,17 @@ describe("fetchVersion", () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(new Response("not json", { status: 200 }));
 
     await expect(fetchVersion()).rejects.toThrow(/Unexpected API response/);
+  });
+
+  it("throws helpful message on network failure", async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(fetchVersion()).rejects.toThrow(/Cannot reach the API/);
+  });
+
+  it("throws with server error message on non-OK JSON body", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({ error: "not found" }, 404));
+
+    await expect(fetchVersion()).rejects.toThrow("not found");
   });
 });
