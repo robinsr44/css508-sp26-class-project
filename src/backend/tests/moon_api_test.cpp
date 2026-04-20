@@ -1,5 +1,16 @@
 // HTTP-level tests for register_moon_api_routes: health, version, CORS, GET/POST /api/moon and /api/sun,
 // validation errors (400), and JSON response shape. Server runs on 127.0.0.1 in a background thread.
+//
+// TestPlan / TestStrategy mapping (moon_api_tests):
+//   HTTP-01 — MoonApiHealth.GetOk
+//   HTTP-02 — MoonApiVersion.GetHasServiceAndVersion
+//   HTTP-03 — MoonApiGetMoon.Valid200Shape
+//   HTTP-04 — MoonApiPostMoon.Valid200Shape, MoonApiParity.GetAndPostMoonMatchPhase
+//   HTTP-05 — MoonApiGetSun.Valid200Shape, MoonApiPostSun.Valid200Shape
+//   HTTP-06 — MoonApiGetMoon.MissingParams400
+//   HTTP-07 — LatLonOutOfRange400, InvalidLatLon400, Post lat/lon type errors
+//   HTTP-08 — InvalidDate400, InvalidTime400, Post JSON/body validation
+//   HTTP-09 — MoonApiCors.Options*
 
 #include "moon_api.h"
 

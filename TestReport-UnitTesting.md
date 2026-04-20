@@ -1,4 +1,99 @@
-# Unit Testing Report
+# Unit testing report
+
+**Report date:** 2026-04-19  
+
+This report lists automated unit tests in the repository and their **expected** outcome (**Pass**) when run on a machine with dependencies installed. It was synchronized with `moon_api_test.cpp`, `moon_ephemeris_test.cpp`, and Vitest files under `src/frontend/src/`.  
+
+### How these results were generated
+
+1. **Test inventory** — Case names and counts were taken from the current test sources (GoogleTest `TEST(...)` blocks and Vitest `it(...)` blocks). Each row in the tables below is one such test.
+2. **Pass/Fail column** — **Pass** means the test is **expected to succeed** after a clean configure/build/install on a typical developer machine (CMake 3.16+, C++17 compiler, Node LTS for the frontend). This document does not embed a unique CI log ID; to capture a **fresh** run for an assignment, follow the commands below and save the terminal output (or attach your CI run URL). You can also prove the same suites using **Docker** test-image builds (see **Using Docker** below).
+
+### Commands to run (regenerate or verify)
+
+Run all commands from the **repository root** unless a step says otherwise. Network access is required the first time CMake **FetchContent** downloads dependencies (e.g. cpp-httplib, GoogleTest).
+
+**Backend (C++ unit tests)**
+
+```bash
+cmake -S src/backend -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Run the suites **either** as registered CTest tests **or** by invoking the binaries directly:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+```bash
+./build/moon_ephemeris_tests
+./build/moon_api_tests
+```
+
+You should see **20** tests pass in `moon_ephemeris_tests`, **22** in `moon_api_tests`, and CTest should report **2** tests (those two executables) if you use `ctest` only.
+
+**Frontend (Vitest)**
+
+```bash
+cd src/frontend
+npm install
+npm test
+```
+
+Equivalent non-interactive run:
+
+```bash
+cd src/frontend
+npm install
+npx vitest run
+```
+
+You should see **26** tests pass across `App.test.tsx`, `api.test.ts`, and `locationTime.test.ts`.
+
+**Using Docker (same tests, containerized build)**
+
+Requires **Docker** and **Docker Compose** (v2: `docker compose`). Unit tests run **during the image build** for the test targets (`ctest` for C++, `npm test` / Vitest for the frontend). If any test fails, the **build fails**—there is no separate “run container” step for unit tests.
+
+From the **repository root**:
+
+Build **both** test images (matches a full local unit-test run):
+
+```bash
+docker compose --profile test build test-backend test-frontend
+```
+
+**C++ tests only:**
+
+```bash
+docker compose --profile test build test-backend
+```
+
+**Frontend tests only:**
+
+```bash
+docker compose --profile test build test-frontend
+```
+
+**Same targets with `docker build`** (equivalent to the services in [docker-compose.yml](docker-compose.yml)):
+
+```bash
+docker build --target test-backend .
+docker build --target test-frontend .
+```
+
+- A successful run ends with the images built (e.g. `moon-tracker-test-backend:local` / `moon-tracker-test-frontend:local` when using Compose) and exit code **0**.
+- First-time builds need network access for base images and dependency downloads.
+- Full detail: [README.md](README.md) § *Unit tests in Docker*.
+
+| Suite | Tests | Notes |
+| --- | ---: | --- |
+| `moon_ephemeris_tests` | 20 | C++ |
+| `moon_api_tests` | 22 | C++ |
+| Vitest (`*.test.ts`, `*.test.tsx`) | 26 | TypeScript / React |
+| **Total** | **68** | |
+
+---
 
 ## Backend
 
@@ -29,7 +124,7 @@
 | `MoonApiPostSun.Valid200Shape` | Valid `POST /api/sun` returns 200 with a `position` object. | Pass |
 | `MoonApiParity.GetAndPostMoonMatchPhase` | Equivalent GET and POST parameters yield the same `phase.cycle_fraction` and `instant_utc`. | Pass |
 
-_Results: all 22 tests passed when running `./build/moon_api_tests` after a Release build (`cmake -B build` / `cmake --build build`) on this repository._
+_22 tests — run `./build/moon_api_tests` after a Release build (`cmake -B build -S src/backend` / `cmake --build build`)._
 
 ### `moon_ephemeris_test.cpp`
 
@@ -56,7 +151,9 @@ _Results: all 22 tests passed when running `./build/moon_api_tests` after a Rele
 | `SunPosition.RangeDegrees` | `sun_position` returns finite azimuth and altitude in degrees within plausible sky ranges. | Pass |
 | `ComputeSunFull.MatchesSunPosition` | `compute_sun_full` matches `sun_position` for the same UTC instant and observer coordinates. | Pass |
 
-_Results: all 20 tests passed when running `./build/moon_ephemeris_tests` after a Release build (`cmake -B build` / `cmake --build build`) on this repository._
+_20 tests — run `./build/moon_ephemeris_tests` after the same build._
+
+---
 
 ## Frontend
 
@@ -65,9 +162,13 @@ _Results: all 20 tests passed when running `./build/moon_ephemeris_tests` after 
 | Test | Description | Result |
 | --- | --- | --- |
 | `App > renders the main heading and loads version from the API` | Renders the main “moon tracker” heading and loads the API service name from mocked `/api/version`. | Pass |
-| `App > submits the form and shows moon phase from mocked API responses` | User submits the form; UI shows the mocked moon phase name and sun position after `/api/moon` and `/api/sun` responses. | Pass |
+| `App > submits the form and shows moon phase from mocked API responses` | User submits the form; UI shows the mocked moon phase name and sun position after `/api/moon` and `/api/sun` responses; asserts **Instant (local)** labels when timezone resolves (TestPlan **FE-02** / **FE-04**). | Pass |
+| `App > disables Compute and shows hint when latitude, longitude, or date is empty` | Submit is disabled and helper text appears when a required field is cleared (**FE-01**). | Pass |
+| `App > shows API error message when moon request fails` | Non-OK moon response shows the API `error` string in the alert (**FE-03**). | Pass |
+| `App > shows UTC-only copy when no timezone is found for coordinates` | Out-of-range lat/lon yields “No timezone found…” visibility copy (**FE-05**). | Pass |
+| `App > Copy URL updates feedback after moon URL copy` | Moon **Copy URL** triggers clipboard write and shows **Copied** feedback (**FE-06**). | Pass |
 
-_Results: 2 tests; run `npm install` and `npm test` (`vitest run`) in `src/frontend` to reproduce._
+_6 tests — run `npm install` and `npm test` (`vitest run`) in `src/frontend`._
 
 ### `api.test.ts`
 
@@ -88,7 +189,7 @@ _Results: 2 tests; run `npm install` and `npm test` (`vitest run`) in `src/front
 | `fetchVersion > throws helpful message on network failure` | Network failure rejects with cannot-reach-API style message. | Pass |
 | `fetchVersion > throws with server error message on non-OK JSON body` | Non-OK JSON error body rejects with the server `error` string. | Pass |
 
-_Results: 14 tests; run `npm install` and `npm test` (`vitest run`) in `src/frontend` to reproduce._
+_14 tests._
 
 ### `locationTime.test.ts`
 
@@ -101,5 +202,10 @@ _Results: 14 tests; run `npm install` and `npm test` (`vitest run`) in `src/fron
 | `formatUtcIsoInZone > formats a valid UTC instant in UTC timezone` | Valid UTC instant formats to a longer string containing the year. | Pass |
 | `formatUtcIsoInZone > returns the original string when Intl.DateTimeFormat throws` | If `Intl.DateTimeFormat` throws, the original ISO string is returned. | Pass |
 
-_Results: 6 tests; run `npm install` and `npm test` (`vitest run`) in `src/frontend` to reproduce._
+_6 tests._
 
+---
+
+## Traceability
+
+Test case IDs **BE-***, **HTTP-***, **FE-*** are mapped to these tests in [TestStrategy.md](TestStrategy.md) (Representative unit tests).

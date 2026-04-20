@@ -1,3 +1,4 @@
+// TestPlan FE-04 (timezone helpers): see TestStrategy.md.
 import { describe, expect, it, vi } from "vitest";
 
 import { formatUtcIsoInZone, getPrimaryTimeZone } from "./locationTime";

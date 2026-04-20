@@ -1,6 +1,6 @@
 # Test plan
 
-This document is the **test plan** for the **moon tracker** class project: a React + TypeScript client and a C++ `moon-api` service. It turns the goals in [TestStrategy.md](TestStrategy.md) into **planned activities**, **environments**, and **checklists**. Functional definitions and API contracts are authoritative in [README.md](README.md) and [Design.md](Design.md).
+This document is the **test plan** for the **moon tracker** class project: a React + TypeScript client and a C++ `moon-api` service. It turns the goals in [TestStrategy.md](TestStrategy.md) into **planned activities**, **environments**, and **checklists** (unit, integration, optional E2E). Functional definitions and API contracts are authoritative in [README.md](README.md) and [Design.md](Design.md).
 
 ---
 
@@ -37,27 +37,26 @@ This document is the **test plan** for the **moon tracker** class project: a Rea
 | **Docker Compose** | Production-like smoke | Host port mapped to container (README); `/api` same origin as UI. |
 | **CI (recommended)** | Repeatable gates | Build C++ + frontend; run unit/API tests; optional Docker smoke. |
 
-**Test data:** Use fixed fixtures (see [TestStrategy.md](TestStrategy.md) § Test data). Record **tolerance** for floating-point comparisons in test code or comments.
+**Test data:** Use fixed **fixtures** (known lat/lon/date/time and expected outcomes) in C++/TS tests or scripts; align with [TestStrategy.md](TestStrategy.md) under **Unit tests** (backend and frontend). Record **tolerance** for floating-point comparisons in test code or comments.
 
 ---
 
-## 4. Test types and coverage targets
+## 4. Test levels
 
-| Type | Focus | Target coverage (plan) |
-|------|--------|-------------------------|
-| **Unit — C++** | `moon_ephemeris`, date/time parsing helpers | All public computation entry points; parsing happy and sad paths. |
-| **Unit — TS** | `locationTime.ts`, `api.ts` (and similar pure modules) | Branches for success, HTTP errors, timezone fallback. |
-| **API / contract** | Status codes, JSON shape, GET vs POST parity | Every route and method in README; representative validation failures. |
-| **E2E (optional)** | One happy-path UI submit | One browser flow per milestone or release. |
-| **Smoke** | Build + health + sample moon | Every CI run or before demo. |
+Structure matches [TestStrategy.md](TestStrategy.md) **§ Test levels**: unit (backend and frontend), integration, optional E2E, and metrics.
 
----
+Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass before milestone complete; **P2** = nice to have.
 
-## 5. Planned test cases (matrix)
+### 4.1 Unit tests — Backend (C++)
 
-Priorities: **P0** = must pass for any merge/demo; **P1** = should pass before milestone complete; **P2** = nice to have.
+**Coverage target:** All public ephemeris entry points and parsing happy/sad paths; HTTP behavior via **`moon_ephemeris_tests`** and **`moon_api_tests`** (in-process **`httplib`**; same sources as `moon-api`). See TestStrategy **Unit tests → Backend**.
 
-### 5.1 Backend — ephemeris and parsing (automated when tests exist)
+| Type | Focus |
+|------|--------|
+| Ephemeris & parsing | `moon_ephemeris`, date/time helpers |
+| HTTP routes | Status codes, JSON shape, GET vs POST parity, CORS/`OPTIONS` — largely **`moon_api_tests`** |
+
+#### 4.1.1 Ephemeris and parsing (automated when tests exist)
 
 | Case ID | Priority | Description | Expected result |
 |---------|----------|-------------|-----------------|
@@ -67,7 +66,7 @@ Priorities: **P0** = must pass for any merge/demo; **P1** = should pass before m
 | BE-04 | P0 | `parse_date` / `parse_time_hh_mm` invalid inputs | Rejection or error path used by callers; no undefined behavior. |
 | BE-05 | P1 | `compute_sun_full` same instant as moon fixture | Altitude/azimuth in plausible ranges; deterministic across runs. |
 
-### 5.2 Backend — HTTP API
+#### 4.1.2 HTTP API (`moon_api_tests` and optional `curl`)
 
 | Case ID | Priority | Description | Expected result |
 |---------|----------|-------------|-----------------|
@@ -81,7 +80,11 @@ Priorities: **P0** = must pass for any merge/demo; **P1** = should pass before m
 | HTTP-08 | P1 | Malformed `date` or `time` string | **400**. |
 | HTTP-09 | P2 | `OPTIONS` on `/api/moon` (and other documented routes) | Success for preflight as used by browsers. |
 
-### 5.3 Frontend
+---
+
+### 4.2 Unit tests — Frontend (TypeScript)
+
+**Coverage target:** `locationTime.ts`, `api.ts`, and similar pure modules; components with mocked **`fetch`**. See TestStrategy **Unit tests → Frontend**.
 
 | Case ID | Priority | Description | Expected result |
 |---------|----------|-------------|-----------------|
@@ -92,36 +95,61 @@ Priorities: **P0** = must pass for any merge/demo; **P1** = should pass before m
 | FE-05 | P1 | Timezone lookup failure | Graceful UTC-only wording (Design). |
 | FE-06 | P2 | Copy URL / curl helpers | Clipboard or feedback behavior per Design. |
 
-### 5.4 Docker / deployment smoke
+---
+
+### 4.3 Integration tests
+
+**Coverage target:** Multiple real layers (see TestStrategy **Integration tests**): HTTP contract against a **running** `moon-api` (optional **`curl`**/scripts beyond **`moon_api_tests`**); optional **Vite** + live **`moon-api`** for real `/api` from the browser; **Docker** smoke for nginx + API + static UI.
+
+#### 4.3.1 Docker / deployment smoke
 
 | Case ID | Priority | Description | Expected result |
 |---------|----------|-------------|-----------------|
 | DO-01 | P0 | `docker compose up --build` (or documented equivalent) | Container serves UI; `/api/health` returns OK. |
 | DO-02 | P0 | `GET` sample `/api/moon` through mapped port | **200** and valid JSON. |
 
+#### 4.3.2 Optional manual / scripted checks
+
+| Check | Notes |
+|-------|--------|
+| **HTTP black-box** | Same expectations as §4.1.2 against a process bound to a fixed port (CI or local). |
+| **Vite + `moon-api`** | Confirm `/api` proxy and paths when unit tests with mocks are insufficient. |
+
 ---
 
-## 6. Execution schedule (suggested)
+### 4.4 E2E tests (optional)
+
+**Coverage target:** One happy-path browser flow (submit coordinates and date; assert visible moon/sun results) per milestone or release. Tools and CI patterns: TestStrategy **Tools → E2E** and **Automation Strategies**.
+
+---
+
+### 4.5 Metrics
+
+**Coverage target:** Performance and operations metrics (API timing, startup, bundle size, uptime, visitors, etc.) are defined in [TestStrategy.md](TestStrategy.md) **§ Metrics**. Record baselines when the course or deployment requires them.
+
+---
+
+## 5. Execution schedule (suggested)
 
 | Phase | Activities | Exit criterion |
 |-------|--------------|----------------|
 | **A — Core correctness** | Implement BE-01–BE-05, HTTP-01–HTTP-08 as automated tests where feasible | Ephemeris and API behaviors reproducible in CI or documented manual script. |
-| **B — UI and integration** | FE-01–FE-05; optional E2E for one fixture | Demo path works on local dev and Docker. |
+| **B — UI and integration** | FE-01–FE-05; optional Vite + `moon-api` check for real `/api`; optional E2E for one fixture; **DO-01**–**DO-02** for Docker smoke | Demo path works on local dev and Docker; packaged stack responds to health and sample moon. |
 | **C — Hardening** | BE-02 polar cases, HTTP-09, FE-06; fuzz a small set of bad inputs | No crashes; errors remain JSON-shaped. |
 
 Adjust phases to match course deadlines; **P0** cases should complete before final demo.
 
 ---
 
-## 7. Entry and exit criteria
+## 6. Entry and exit criteria
 
-### 7.1 Entry (start testing a build)
+### 6.1 Entry (start testing a build)
 
 - Code compiles: C++ `cmake` build; frontend `npm run build`.
 - For API cases: `moon-api` running on a known port (or Docker stack up).
 - Baseline fixtures checked in or documented for reproducibility.
 
-### 7.2 Exit (ready for demo / submission)
+### 6.2 Exit (ready for demo / submission)
 
 - All **P0** automated cases pass (or P0 manual checklist signed off if automation is not yet implemented).
 - No open **P0** defects for routes documented in README.
@@ -129,7 +157,7 @@ Adjust phases to match course deadlines; **P0** cases should complete before fin
 
 ---
 
-## 8. Roles and responsibilities (typical for a small team)
+## 7. Roles and responsibilities (typical for a small team)
 
 | Role | Responsibility |
 |------|----------------|
@@ -141,17 +169,18 @@ For a solo project, one person covers all roles but still uses the checklists.
 
 ---
 
-## 9. Deliverables
+## 8. Deliverables
 
 | Deliverable | Description |
 |-------------|-------------|
-| Automated tests | C++ test binary / `ctest`; frontend test script; optional API script. |
-| CI configuration | Optional workflow running build + tests + smoke (see TestStrategy). |
+| Automated tests | C++ test binaries / `ctest` (`moon_ephemeris_tests`, `moon_api_tests`); frontend **Vitest** suite; optional **`curl`**/API scripts. |
+| CI configuration | **GitHub Actions** (or equivalent) running build + unit/API tests; optional Docker smoke (see [TestStrategy.md](TestStrategy.md) § Automation Strategies). |
 | Runbook | README commands sufficient to run tests locally; this plan updated if cases change. |
+| Metrics baselines (optional) | If required for the course or a public deployment: capture entries from [TestStrategy.md](TestStrategy.md) § Metrics (e.g. API timing, uptime, visitor counts). |
 
 ---
 
-## 10. Risks and mitigations
+## 9. Risks and mitigations
 
 | Risk | Mitigation |
 |------|------------|
@@ -162,19 +191,21 @@ For a solo project, one person covers all roles but still uses the checklists.
 
 ---
 
-## 11. Traceability
+## 10. Traceability
 
 | Strategy objective | Plan sections |
 |--------------------|----------------|
-| Correctness | §2 T1–T4, §5 matrices |
-| Regression safety | §4 unit/API, §5 BE/HTTP |
-| Integration | §3 environments, §5.3 FE, §5.4 DO |
-| Fast feedback | §4, §6 phase A |
+| Correctness | §2 T1–T4, §4.1–§4.2 case matrices |
+| Regression safety | §4.1–§4.2 |
+| Integration (HTTP, optional FE+API, Docker smoke) | §3 environments, §4.3, §5 phase B |
+| Fast feedback | §4.1–§4.2, §5 phase A |
+| Performance / operations metrics | [TestStrategy.md](TestStrategy.md) § Metrics; §4.5; optional baselines in §8 |
 
 ---
 
-## 12. Change log
+## 11. Change log
 
 | Date | Change |
 |------|--------|
 | *(initial)* | Test plan created; aligned with TestStrategy and README/Design. |
+| 2026-04-19 | Aligned with TestStrategy; restructured **§4** into **Test levels** (unit backend, unit frontend, integration, optional E2E, metrics) matching [TestStrategy.md](TestStrategy.md); integration/FE+API/Docker in schedule; Vitest/ctest deliverables; traceability and fixture reference updates; renumbered §5–§11. |

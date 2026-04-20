@@ -1,5 +1,12 @@
 // Unit tests for moon:: ephemeris helpers: Julian/unix conversion, parsing, ISO-8601 output,
 // lunar illumination and horizon, moonrise/moonset for a UTC day, compute_full, and sun position.
+//
+// TestPlan / TestStrategy mapping (moon_ephemeris_tests):
+//   BE-01 — ComputeFull.*, MoonTimes.MidLatitudeSummerDay
+//   BE-02 — MoonTimes.HighLatitudePolarFlags
+//   BE-03 — MoonTimes.LeapDay
+//   BE-04 — ParseDate.*, ParseTime.*, Iso8601Utc.* (invalid/reject paths)
+//   BE-05 — SunPosition.RangeDegrees, ComputeSunFull.MatchesSunPosition
 
 #include "moon_ephemeris.h"
 

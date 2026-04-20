@@ -1,3 +1,4 @@
+// TestPlan FE-03 (API client errors) + fetch URL/shape tests: see TestStrategy.md.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchMoon, fetchSun, fetchVersion } from "./api";
