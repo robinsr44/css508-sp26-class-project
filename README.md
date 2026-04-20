@@ -183,7 +183,7 @@ Output: **`src/frontend/dist/`**. Serving that folder is optional for local work
 
 Base path: **`/api`**. Responses are **JSON** with `Content-Type: application/json`. Errors use **400** / **500** with a body like `{"error":"..."}`.
 
-**CORS** (for browsers): `Access-Control-Allow-Origin: *`, methods `GET`, `POST`, `OPTIONS`, header `Content-Type` allowed. `OPTIONS` is defined for `/api/moon` and `/api/health`.
+**CORS** (for browsers): `Access-Control-Allow-Origin: *`, methods `GET`, `POST`, `OPTIONS`, header `Content-Type` allowed. `OPTIONS` is defined for `/api/moon`, `/api/sun`, `/api/health`, and `/api/version`.
 
 ### `GET /api/health`
 
@@ -199,6 +199,22 @@ curl -s http://127.0.0.1:8080/api/health
 
 ```json
 {"status":"ok"}
+```
+
+### `GET /api/version`
+
+Returns build metadata for the running server.
+
+**Example**
+
+```bash
+curl -s http://127.0.0.1:8080/api/version
+```
+
+**Example response**
+
+```json
+{"service":"moon-api","version":"1.1.0"}
 ```
 
 ### `GET /api/moon`
@@ -262,6 +278,43 @@ curl -s -X POST http://127.0.0.1:8080/api/moon \
 ```
 
 `visibility.state` is **`normal`**, **`always_up`**, or **`always_down`**. For `normal`, moonrise/moonset may be omitted in edge cases; `hours_above_horizon` appears when both rise and set are present.
+
+### `GET /api/sun`
+
+**Query parameters** — same as `GET /api/moon` (`lat`, `lon`, `date`, optional `time` UTC default `12:00`).
+
+Returns the **sun’s apparent azimuth and altitude** at the requested UTC instant (low-precision suncalc-style model). This does **not** include sunrise/sunset times.
+
+**Example**
+
+```bash
+curl -s "http://127.0.0.1:8080/api/sun?lat=47.6062&lon=-122.3321&date=2026-04-05&time=12:00"
+```
+
+### `POST /api/sun`
+
+**Body** (JSON): same fields as `POST /api/moon`.
+
+**Example**
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/sun \
+  -H "Content-Type: application/json" \
+  -d '{"lat":47.6062,"lon":-122.3321,"date":"2026-04-05","time":"12:00"}'
+```
+
+### Successful `GET/POST /api/sun` response shape
+
+```json
+{
+  "instant_utc": "2026-04-05T12:00:00Z",
+  "location": { "latitude": 47.6062, "longitude": -122.3321 },
+  "position": {
+    "azimuth_deg": -119.54,
+    "altitude_deg": -16.31
+  }
+}
+```
 
 ---
 

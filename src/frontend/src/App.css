@@ -99,3 +99,117 @@ button:disabled {
   color: #7f8799;
   font-size: 0.85rem;
 }
+
+.inline-code {
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.api-direct-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.api-url-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.api-url-row > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.api-label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8b93a8;
+  margin-bottom: 0.25rem;
+}
+
+.api-url {
+  display: block;
+  font-size: 0.78rem;
+  word-break: break-all;
+  line-height: 1.45;
+  color: #c5cad8;
+}
+
+.btn-secondary {
+  margin-top: 1.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eaf0;
+  flex-shrink: 0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.curl-details {
+  margin-top: 0.5rem;
+}
+
+.curl-details summary {
+  cursor: pointer;
+  color: #a8b0c4;
+  font-size: 0.9rem;
+}
+
+.api-pre {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  color: #c8cfdc;
+}
+
+.raw-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #c8cfdc;
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+}
+
+.raw-toggle input {
+  width: auto;
+}
+
+.raw-json-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .raw-json-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.raw-json-heading {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a8b0c4;
+}
