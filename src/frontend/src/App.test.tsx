@@ -1,9 +1,15 @@
 // TestPlan FE-01–FE-06 coverage: see TestStrategy.md (Frontend representative unit tests).
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+
+function computeButton(container: HTMLElement) {
+  const form = container.querySelector("form.card");
+  if (!form) throw new Error("Expected form.card");
+  return within(form).getByRole("button", { name: /compute/i });
+}
 
 const moonApiBody = {
   instant_utc: "2024-06-15T12:00:00Z",
@@ -76,11 +82,11 @@ describe("App", () => {
 
   it("submits the form and shows moon phase from mocked API responses", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    const { container } = render(<App />);
 
     await screen.findByText(/moon-api/);
 
-    await user.click(screen.getByRole("button", { name: /compute/i }));
+    await user.click(computeButton(container));
 
     expect(await screen.findByText("Waxing Gibbous")).toBeInTheDocument();
     expect(screen.getByText(/Sun position/i)).toBeInTheDocument();
@@ -91,14 +97,14 @@ describe("App", () => {
   // TestPlan FE-01 — empty required fields: no submit, helper text
   it("disables Compute and shows hint when latitude, longitude, or date is empty", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    const { container } = render(<App />);
 
     await screen.findByText(/moon-api/);
 
     const latInput = screen.getByLabelText(/latitude/i);
     await user.clear(latInput);
 
-    const compute = screen.getByRole("button", { name: /compute/i });
+    const compute = computeButton(container);
     expect(compute).toBeDisabled();
     expect(screen.getByText(/Fill in latitude, longitude, and date to compute/i)).toBeInTheDocument();
   });
@@ -139,10 +145,10 @@ describe("App", () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
+    const { container } = render(<App />);
 
     await screen.findByText(/moon-api/);
-    await user.click(screen.getByRole("button", { name: /compute/i }));
+    await user.click(computeButton(container));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/invalid moon/i);
@@ -151,7 +157,7 @@ describe("App", () => {
   // TestPlan FE-05 — timezone lookup fails: UTC-only copy
   it("shows UTC-only copy when no timezone is found for coordinates", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    const { container } = render(<App />);
 
     await screen.findByText(/moon-api/);
 
@@ -160,7 +166,7 @@ describe("App", () => {
     await user.clear(screen.getByLabelText(/longitude/i));
     await user.type(screen.getByLabelText(/longitude/i), "0");
 
-    await user.click(screen.getByRole("button", { name: /compute/i }));
+    await user.click(computeButton(container));
 
     expect(await screen.findByText(/No timezone found for these coordinates/i)).toBeInTheDocument();
   });
@@ -168,7 +174,17 @@ describe("App", () => {
   // TestPlan FE-06 — copy URL feedback
   it("Copy URL updates feedback after moon URL copy", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
+    vi.stubGlobal(
+      "navigator",
+      new Proxy(globalThis.navigator, {
+        get(target, prop, receiver) {
+          if (prop === "clipboard") {
+            return { writeText };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }),
+    );
 
     const user = userEvent.setup();
     render(<App />);
