@@ -1,7 +1,7 @@
 // TestPlan FE-04 (timezone helpers): see TestStrategy.md.
 import { describe, expect, it, vi } from "vitest";
 
-import { formatUtcIsoInZone, getPrimaryTimeZone } from "./locationTime";
+import { formatInstantForDisplay, formatUtcIsoInZone, getPrimaryTimeZone } from "./locationTime";
 
 describe("getPrimaryTimeZone", () => {
   it("returns null when latitude is out of range", () => {
@@ -18,6 +18,25 @@ describe("getPrimaryTimeZone", () => {
     const tz = getPrimaryTimeZone(47.6062, -122.3321);
     expect(tz).toBeTruthy();
     expect(tz).toMatch(/^America\//);
+  });
+});
+
+describe("formatInstantForDisplay", () => {
+  it("uses UTC when useGmt is true regardless of location zone", () => {
+    const iso = "2024-06-15T12:00:00.000Z";
+    expect(formatInstantForDisplay(iso, true, "America/Los_Angeles")).toBe(formatUtcIsoInZone(iso, "UTC"));
+  });
+
+  it("uses the location zone when useGmt is false and a zone exists", () => {
+    const iso = "2024-06-15T12:00:00.000Z";
+    expect(formatInstantForDisplay(iso, false, "America/Los_Angeles")).toBe(
+      formatUtcIsoInZone(iso, "America/Los_Angeles"),
+    );
+  });
+
+  it("falls back to UTC when no location zone and GMT not requested", () => {
+    const iso = "2024-06-15T12:00:00.000Z";
+    expect(formatInstantForDisplay(iso, false, null)).toBe(formatUtcIsoInZone(iso, "UTC"));
   });
 });
 
