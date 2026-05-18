@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fetchMoon, fetchSun, type MoonApiResponse, type SunApiResponse } from "./api";
 import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
-import MoonPhase, { illuminationIndicatesFullMoon } from "./MoonPhase";
+import MoonPhase from "./MoonPhase";
+import { phaseDisplayName } from "./phaseDisplayName";
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
@@ -19,17 +20,6 @@ function hoursAboveHorizonText(hours: number): string {
   if (h <= 0) return "less than an hour";
   if (h === 1) return "about 1 hour";
   return `about ${h} hours`;
-}
-
-/** Cycle-eighth name can lag illumination near full; align label with Full band (>99% lit). */
-function phaseDisplayName(data: MoonApiResponse): string {
-  if (
-    typeof data.illumination.fraction === "number" &&
-    illuminationIndicatesFullMoon(data.illumination.fraction, data.illumination.percent)
-  ) {
-    return "Full";
-  }
-  return data.phase.name;
 }
 
 export default function App() {

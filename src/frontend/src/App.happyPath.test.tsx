@@ -9,18 +9,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { MoonApiResponse, SunApiResponse } from "./api";
 import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
-import { illuminationIndicatesFullMoon } from "./MoonPhase";
+import { phaseDisplayName } from "./phaseDisplayName";
 import { buildMoonSunGoldenResponses } from "./test/ephemerisMirror";
 
 function computeButton(container: HTMLElement) {
   const form = container.querySelector("form.card");
   if (!form) throw new Error("Expected form.card");
   return within(form).getByRole("button", { name: /compute/i });
-}
-
-function phaseDisplayLabel(apiPhaseName: string, fraction: number, percent: number): string {
-  if (illuminationIndicatesFullMoon(fraction, percent)) return "Full";
-  return apiPhaseName;
 }
 
 function versionResponse() {
@@ -189,11 +184,7 @@ describe("happy path — moon cycle (mirror ephemeris)", () => {
     const [y, mo, d] = dateStr.split("-").map(Number);
     const { moon: goldenMoon, sun: goldenSun } = buildMoonSunGoldenResponses(y, mo, d, 12, 0, SEATTLE_LAT, SEATTLE_LON);
 
-    const expectedPhase = phaseDisplayLabel(
-      goldenMoon.phase.name,
-      goldenMoon.illumination.fraction,
-      goldenMoon.illumination.percent,
-    );
+    const expectedPhase = phaseDisplayName(goldenMoon);
 
     expect(await screen.findByRole("heading", { name: /^Sun position$/i })).toBeInTheDocument();
 

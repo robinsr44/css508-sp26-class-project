@@ -84,10 +84,116 @@ describe("App", () => {
 
     await user.click(computeButton(container));
 
-    expect(await screen.findByText("Waxing Gibbous")).toBeInTheDocument();
+    expect(await screen.findByText(/Waning Gibbous/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Sun position/i })).toBeInTheDocument();
     // FE-04: local time labels when tz-lookup resolves for Seattle coordinates
     expect(screen.getAllByText(/Local time\s*:/i).length).toBeGreaterThan(0);
+  });
+
+  it('shows Waxing Crescent when eighth-bucket phase is still "New" but illumination exceeds 1%', async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/version")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ service: "moon-api", version: "1.1.0" }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        if (url.includes("/api/moon")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                ...moonApiBody,
+                phase: {
+                  name: "New",
+                  cycle_fraction: 0.054,
+                  sun_moon_earth_angle_deg: 33,
+                },
+                illumination: { fraction: 0.029, percent: 2.9 },
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+        if (url.includes("/api/sun")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(sunApiBody), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        return Promise.resolve(new Response("not found", { status: 404 }));
+      }),
+    );
+
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(computeButton(container));
+
+    expect(await screen.findByText(/Waxing Crescent/i)).toBeInTheDocument();
+  });
+
+  it('shows Waxing Gibbous when API phase is still "First Quarter" but illumination is well above half-lit', async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/version")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ service: "moon-api", version: "1.1.0" }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        if (url.includes("/api/moon")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                ...moonApiBody,
+                phase: {
+                  name: "First Quarter",
+                  cycle_fraction: 0.3,
+                  sun_moon_earth_angle_deg: 88,
+                },
+                illumination: { fraction: 0.72, percent: 72.0 },
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+        if (url.includes("/api/sun")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(sunApiBody), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        return Promise.resolve(new Response("not found", { status: 404 }));
+      }),
+    );
+
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(computeButton(container));
+
+    expect(await screen.findByText(/Waxing Gibbous/i)).toBeInTheDocument();
   });
 
   it("toggles result labels between local time and UTC", async () => {

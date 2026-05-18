@@ -12,7 +12,8 @@ interface MoonPhaseProps {
 
 /**
  * Illumination-band shortcuts for the graphic (fraction k = lit portion of disk):
- * New moon <1.0%, Crescent ~1–49%, Quarter ~49–51%, Gibbous ~51–99%, Full >99.0%.
+ * New moon <1.0%, Crescent up to ~48% lit, Quarter only 48% &lt; lit &lt; 52%,
+ * Gibbous ~52–99%, Full >99.0%. (See `phaseDisplayName.ts` for exact UI bands.)
  * Crescent / quarter / gibbous use the shared terminator path; only the ends snap to solids.
  */
 /** Solid dark disk only when lit fraction is strictly below 1.0%. */
@@ -23,6 +24,18 @@ const FULL_MOON_MIN_PERCENT_STRICT = 99;
 
 /** When percent is absent: fraction above this ⇒ full disk (>99.0%). */
 const FULL_MOON_EXCLUSIVE_ABOVE_LIT = 0.99;
+
+/** True when illumination is in the New band (<1.0% lit; solid dark disk + “New” label override). */
+export function illuminationIndicatesNewMoon(
+  illuminationFraction: number,
+  illuminationPercent?: number,
+): boolean {
+  const k = Number(illuminationFraction);
+  if (illuminationPercent !== undefined && Number.isFinite(illuminationPercent) && illuminationPercent < 1) {
+    return true;
+  }
+  return Number.isFinite(k) && k < NEW_MOON_LT_FRACTION;
+}
 
 /** True when illumination is in the Full band (solid light disk + “Full” label override). */
 export function illuminationIndicatesFullMoon(
