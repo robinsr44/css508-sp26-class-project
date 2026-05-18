@@ -141,7 +141,9 @@ Runs once before browser workers start (not counted in the three test-case total
 | — | Pre-flight | [`e2e/global-setup.ts`](src/frontend/e2e/global-setup.ts) | Health gate (once per run) |
 | E | Smoke compute | [`e2e/smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) | 1 |
 | F | Location stub | [`e2e/smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) | 1 |
-| G | A11y axe | [`e2e/accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) | 1 |
+| G | A11y axe | [`e2e/accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) |
+| H | Manual Testing | See Manual E2E Testing - Moon Phase Detection.pdf | 31 |
+1 |
 
 **Last run totals (snapshot in executive summary):** 3 Playwright tests passed; 0 failed (`playwright test --reporter=list`).
 
