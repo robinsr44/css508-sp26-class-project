@@ -155,11 +155,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>Moon tracker</h1>
-      <p className="subtitle">
-        Enter a location and date to see moon phase, moonrise/moonset times, and sun position.
-      </p>
+      <header className="app-header">
+        <h1>Moon tracker</h1>
+        <p className="subtitle">
+          Enter a location and date to see moon phase, moonrise/moonset times, and sun position.
+        </p>
+      </header>
 
+      <main className="app-main">
       <form className="card" onSubmit={onSubmit}>
         <div>
           <label htmlFor="location-search">Location</label>
@@ -282,7 +285,7 @@ export default function App() {
               />
             ) : null}
             <div>
-              <h3>Phase</h3>
+              <h2>Phase</h2>
               <p>
                 <strong>{phaseDisplayName(data)}</strong>
               </p>
@@ -294,7 +297,7 @@ export default function App() {
             </div>
           </div>
           <div className="result-item">
-            <h3>Illumination</h3>
+            <h2>Illumination</h2>
             <p>
               <strong>
                 {typeof data.illumination.percent === "number"
@@ -309,7 +312,7 @@ export default function App() {
             </p>
           </div>
           <div className="result-item">
-            <h3>Visibility</h3>
+            <h2>Visibility</h2>
             {!locationTimeZone ? (
               <p className="muted" style={{ marginTop: 0 }}>
                 No timezone found for these coordinates; showing UTC only.
@@ -351,7 +354,7 @@ export default function App() {
       {sunData ? (
         <div className="card result-grid">
           <div className="result-item">
-            <h3>Sun position</h3>
+            <h2>Sun position</h2>
             <p className="muted" style={{ marginTop: 0 }}>
               Azimuth and altitude at your selected time.
             </p>
@@ -378,6 +381,7 @@ export default function App() {
           </div>
         </div>
       ) : null}
+      </main>
     </div>
   );
 }
