@@ -51,3 +51,8 @@ build/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
+
+# Playwright (frontend)
+src/frontend/playwright-report/
+src/frontend/test-results/
+src/frontend/blob-report/
