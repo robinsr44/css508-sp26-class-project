@@ -8,7 +8,7 @@ The client is a single-page application under `src/frontend/`. It collects obser
 
 - **Observation form** — Latitude, longitude, calendar date, and UTC time used for both moon and sun requests.
 - **Parallel API requests** — On submit, the client requests moon and sun data together and shows errors if either call fails.
-- **Moon results** — Phase name, cycle metrics, illumination, moonrise/moonset (with local and UTC labeling where applicable).
+- **Moon results** — Phase name (with illumination-aware override near full—see below), cycle metrics, illumination, a **moon phase disk** illustration (`MoonPhase.tsx`), moonrise/moonset (with local and UTC labeling where applicable).
 - **Sun results** — Sun azimuth and altitude at the selected instant, with local and UTC labeling where applicable.
 - **Timezone-aware display** — Resolves an IANA timezone from lat/lon and formats selected instants and rise/set strings for readability.
 - **API version** — On load, fetches `/api/version` and shows the service name and version when available.
@@ -22,13 +22,28 @@ The client is a single-page application under `src/frontend/`. It collects obser
 |--------|------------|
 | Observation form | User inputs **latitude** and **longitude** (decimal degrees), a **date** (`YYYY-MM-DD`), and **UTC time** (`HH:MM`). Submitting runs the computation for that single observation instant. |
 | Parallel API requests | The UI issues **two** `GET` requests (`/api/moon` and `/api/sun`) with the same parameters **in parallel** (`Promise.all`) so results stay consistent for one submit. |
-| Moon results | Renders the moon JSON: **phase** (name and cycle-related fields), **illumination** (fraction/percent at the instant), and **visibility** (moonrise/moonset in normal cases, or polar `always_up` / `always_down`). |
+| Moon results | Renders the moon JSON: **phase** (name and cycle-related fields—see **Moon phase illustration** for label override rules), **illumination** (fraction/percent at the instant), **visibility** (moonrise/moonset in normal cases, or polar `always_up` / `always_down`), and the SVG **phase disk** beside the phase heading. |
 | Sun results | Renders the sun JSON: **position** (**azimuth** and **altitude** in degrees at the requested UTC instant). The client does not compute ephemeris; values come from the API. |
 | Timezone-aware display | Uses **tz-lookup** on `(lat, lon)` to pick an **IANA timezone**, then **Intl.DateTimeFormat** to show API UTC instants as **local date/time strings** (and still shows UTC where noted). If lookup fails, the UI falls back to UTC-only wording. |
 | API version | Calls **`GET /api/version`** once on startup and displays **`service`** and **`version`** when the request succeeds; failures are ignored silently (no banner). |
 | Direct API access | Derives **same-origin** URLs with the current form query string so users or scripts can hit the API **outside** the form (browser address bar, `curl`, HTTP clients). Includes copy-to-clipboard and a collapsible **curl** snippet block. |
 | Raw JSON | Optional checkbox reveals **pretty-printed** `JSON.stringify` of the last successful moon and sun responses (mirrors what `GET` returned). |
 | Form validation and UX | Requires non-empty lat/lon/date before submit; validates lat/lon parse as finite numbers on submit; shows **loading** state during requests and **error** messages from failed network or HTTP error bodies; copy buttons show brief **Copied** / error feedback. |
+
+### Moon phase illustration
+
+The disk beside **Phase** is rendered by **`src/frontend/src/MoonPhase.tsx`** with styling from **`moon-disk-bg`** and **`moon-lit-face`** in [`src/frontend/src/App.css`](src/frontend/src/App.css). Astronomy remains server-side; the graphic uses **`illumination.fraction`**, **`illumination.percent`** (optional but passed from `App.tsx`), and **`phase.cycle_fraction`** only for waxing vs waning—not for terminator curvature.
+
+| Topic | Behavior |
+|--------|----------|
+| **Layers** | A **dark** full circle (disk “background”), then a **light** filled path for the sunlit portion. That matches the teaching convention: new moon is almost entirely dark; gibbous phases are mostly light; full moon is entirely light (within the thresholds below). |
+| **Terminator shape** | Simplified **orthographic** model: terminator cross-section is an ellipse with vertical semi-axis \(r\) and horizontal semi-axis \(r \cdot \|2k - 1\|\), where \(k\) is **`illumination.fraction`** \((1 + \cos(\mathrm{inc}))/2\) from the API). That matches \(\|\cos(\mathrm{inc})\|\); **do not** infer terminator width from **`cycle_fraction`** alone—the backend **`phase`** wheel uses SunCalc-style mapping that is **not** linear in elongation, which previously skewed the limb when paired with \(\cos(2\pi \cdot \mathrm{cycle\_fraction})\). |
+| **Waxing vs waning** | **`cycle_fraction` below 0.5** → waxing limb geometry (lit limb grows from the **right** in this SVG). **`cycle_fraction` at or above 0.5** → same path mirrored horizontally **`scale(-1, 1)`** about the disk center (single waxing construction avoids filling the complementary wedge that produced a thin crescent when the moon was almost full). |
+| **Solid “snapshot” disks** | **New:** lit fraction strictly **below 1.0%** (`k < 0.01`) → dark disk only (no limb path). **Full:** lit **above 99.0%** → solid light disk over the dark layer; **`illuminationIndicatesFullMoon`** uses **`percent > 99`** when percent is present, else **`fraction > 0.99`**, so displayed percentages stay aligned with the rule even when floats differ slightly from rounding. |
+| **Intermediate phases** | Crescent, quarter, and gibbous share the **same path generator**; only the endpoints snap to the solid new/full treatments above. Approximate bands documented in-code: new below 1%, crescent ~1–49%, quarter ~49–51%, gibbous ~51–99%, full above 99%. |
+| **Phase label override** | **`phaseDisplayName`** in [`src/frontend/src/App.tsx`](src/frontend/src/App.tsx): when **`illuminationIndicatesFullMoon`** is true, the UI shows **“Full”** even if the API **phase name** is still an eighth-of-cycle label (e.g. **Waxing Gibbous**)—illumination near opposition can exceed the full threshold slightly before the cycle bucket flips. |
+
+The helper **`illuminationIndicatesFullMoon`** is exported from `MoonPhase.tsx` for reuse by the label logic.
 
 ## HTTP API
 

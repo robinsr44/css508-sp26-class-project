@@ -1,5 +1,5 @@
 # Test strategy
-This goal of this document is to outline the test strategy for this **moon tracker** project, which includes two main high level components
+The goal of this document is to outline the test strategy for this **moon tracker** project, which includes two main high level components
 - frontend (`src/frontend`): **React + TypeScript** Single Page Application (SPA)
 - backend (`src/backend/`): **C++** which includes the API `moon-api` and the calculations in `moon_ephemeris.cpp`
 
@@ -9,7 +9,8 @@ This goal of this document is to outline the test strategy for this **moon track
 - `moon_api` and available HTTP routes (GET and POST)
 - Request and error response validation for the API
 - Verify the API-client behavior as well as display components
-- Some additional smoke tests for proof-of-life and sanity checking
+- **Browser E2E** — **Playwright** + Chromium against **Vite** with a live **`moon-api`** (health gate + smoke, stubbed geocoder, accessibility scan); see [E2ETestPlan.md](E2ETestPlan.md)
+- Additional smoke tests for proof-of-life and sanity checking (API scripts, Docker)
 
 
 # General Processes
@@ -25,15 +26,15 @@ The test strategy will follow a layered testing strategy with the following leve
 | Backend unit | **CMake** + **ctest**; **GoogleTest** or **Catch2** built from the same C++ code as `moon-api`. |
 | Frontend unit | **Vitest** (or Jest) with **jsdom** for TS/React tests under `src/frontend`. |
 | API / contract | `curl` sends the HTTP requests; `jq` picks fields out of the JSON. Either run those in a shell or wrap them in a small script. Run moon-api locally on a fixed port so tests always hit the same endpoint. |
-| E2E (optional) | Automated browser tests can hit your local dev or preview server while the API runs next to it; in CI, run the same stack via Docker Compose. |
+| E2E (browser) | **Playwright** + **Chromium** (`src/frontend/e2e/`): real clicks and assertions against **Vite** while **`moon-api` listens on 8080** (same `/api` proxy as local dev). Optional **Docker Compose** base URL via env vars (see [E2ETestPlan.md](E2ETestPlan.md)). **axe** via **`@axe-core/playwright`** (`color-contrast` disabled for dark-theme demos). |
 | Packaging | **Docker** / **Docker Compose** for production-like smoke (`/api/health`, sample `/api/moon`). |
 
 ## Automation Strategies
 | Strategy | Description |
 |----------|-------------|
 | **Local** | Day to day: **CMake** for the backend, **npm** for the frontend. Full Docker builds are optional; see **README**. |
-| **CI** | **GitHub Actions** running unit and integration tests at minimum. |
-| **E2E** | Full-app checks for a realistic user path and overall behavior (when we add them). |
+| **CI** | **GitHub Actions**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — frontend **Vitest**/lint, backend **cmake**/**ctest** + moon-api TCP smoke, Docker compose smoke. [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) — build **`moon-api`**, **Playwright** **`npm run test:e2e`** on pull requests. |
+| **E2E** | Automated full-stack browser checks (live **`/api/moon`** & **`/api/sun`** through the dev proxy, illum time-toggle UI, stubbed **Nominatim** route, post-compute **axe** scan). Mapped to **E2E-01**–**E2E-03** in [TestPlan.md](TestPlan.md). |
 | **Beta (stretch)** | Real people try the app and give feedback on design and usability. |
 
 # Test levels
@@ -112,11 +113,23 @@ The test strategy will follow a layered testing strategy with the following leve
 
 ## Integration tests
 
-Integration tests check **multiple layers at once**—more than a single function in isolation, but involves a subset of the system as compared to **E2E**.
+Integration tests check **multiple layers at once**—more than a single function in isolation, but short of a **full browser user journey** (that is **E2E**, below).
 
-- **HTTP API / contract** — Check GET and POST responses for an actual server that is running
-- **Frontend + API (optional)** — Optional: **Vite** plus a running **`moon-api`** so the browser uses real **`/api`** traffic (not mocks). Use when you still need to prove the proxy and paths work end-to-end.
-- **Packaging / deploy smoke** — Tests that the docker container is building correctly and contains the requisite components
+- **HTTP API / contract** — Check GET and POST responses for an actual server that is running (including **`moon_api`** + **`ctest`**, black-box scripts against **`moon-api`** on a fixed port, and Docker smoke **`/api`** checks).
+- **Packaging / deploy smoke** — Tests that the docker container is building correctly and contains the requisite components.
+
+Driving **Chromium** through the SPA while **`moon-api`** and **Vite** run together is **end-to-end** automation (**Playwright**), not integration.
+
+## End-to-end (browser)
+
+E2E complements **Vitest** (fast, deterministic mocks) by exercising **real Chromium**, **real HTTP** to **`moon-api`**, and **`global-setup`** health checks before specs run.
+
+| Topic | Approach |
+|-------|----------|
+| **Stack** | **`moon-api` on 8080**; Playwright starts **Vite** (embedded webServer) so **`/api`** is proxied like developer workflow. |
+| **Specs** | [`src/frontend/e2e/smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — happy-path compute + illumination pill toggles; city search with **`page.route`** stub for **Nominatim**. [`src/frontend/e2e/accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) — **AxeBuilder** after results render. |
+| **CI** | Workflow **[`e2e.yml`](.github/workflows/e2e.yml)** on **`pull_request`** (opened, synchronize, reopened). |
+| **Detail / commands** | [E2ETestPlan.md](E2ETestPlan.md) |
 
 # Metrics
 

@@ -5,11 +5,11 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  { ignores: ["dist", "playwright-report", "test-results", "blob-report"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["vite.config.ts"],
+    files: ["vite.config.ts", "playwright.config.ts", "e2e/**/*.ts"],
     languageOptions: {
       globals: globals.node,
     },

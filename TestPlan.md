@@ -1,6 +1,6 @@
 # Test plan
 
-This document is the **test plan** for the **moon tracker** class project: a React + TypeScript client and a C++ `moon-api` service. It turns the goals in [TestStrategy.md](TestStrategy.md) into **planned activities**, **environments**, and **checklists** (unit, integration, optional E2E). Functional definitions and API contracts are authoritative in [README.md](README.md) and [Design.md](Design.md).
+This document is the **test plan** for the **moon tracker** class project: a React + TypeScript client and a C++ `moon-api` service. It turns the goals in [TestStrategy.md](TestStrategy.md) into **planned activities**, **environments**, and **checklists** (unit, integration, E2E). Functional definitions and API contracts are authoritative in [README.md](README.md) and [Design.md](Design.md). Browser E2E detail and run commands live in [E2ETestPlan.md](E2ETestPlan.md).
 
 ---
 
@@ -9,7 +9,7 @@ This document is the **test plan** for the **moon tracker** class project: a Rea
 | Item | Value |
 |------|--------|
 | **Purpose** | Plan what to test, how, and when; record pass/fail criteria for releases and coursework milestones. |
-| **Related documents** | [TestStrategy.md](TestStrategy.md), [Design.md](Design.md), [README.md](README.md) |
+| **Related documents** | [TestStrategy.md](TestStrategy.md), [E2ETestPlan.md](E2ETestPlan.md), [Design.md](Design.md), [README.md](README.md) |
 | **Revision** | Update when routes, JSON shapes, or deployment paths change. |
 
 ---
@@ -35,7 +35,7 @@ This document is the **test plan** for the **moon tracker** class project: a Rea
 | **Local dev** | Developer iteration | `moon-api` on chosen port; Vite dev server with `/api` proxy (README). |
 | **API-only** | Contract and ephemeris checks | `curl` / scripts against `http://127.0.0.1:<port>`; no UI. |
 | **Docker Compose** | Production-like smoke | Host port mapped to container (README); `/api` same origin as UI. |
-| **CI (recommended)** | Repeatable gates | Build C++ + frontend; run unit/API tests; optional Docker smoke. |
+| **CI (recommended)** | Repeatable gates | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): frontend lint/tests, backend **ctest** + moon-api TCP smoke, Docker compose smoke. [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml): Playwright against live **`moon-api`** (see §4.4). |
 
 **Test data:** Use fixed **fixtures** (known lat/lon/date/time and expected outcomes) in C++/TS tests or scripts; align with [TestStrategy.md](TestStrategy.md) under **Unit tests** (backend and frontend). Record **tolerance** for floating-point comparisons in test code or comments.
 
@@ -43,7 +43,7 @@ This document is the **test plan** for the **moon tracker** class project: a Rea
 
 ## 4. Test levels
 
-Structure matches [TestStrategy.md](TestStrategy.md) **§ Test levels**: unit (backend and frontend), integration, optional E2E, and metrics.
+Structure matches [TestStrategy.md](TestStrategy.md) **§ Test levels**: unit (backend and frontend), integration, E2E (Playwright; see §4.4), and metrics.
 
 Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass before milestone complete; **P2** = nice to have.
 
@@ -117,9 +117,19 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 
 ---
 
-### 4.4 E2E tests (optional)
+### 4.4 E2E tests (Playwright)
 
-**Coverage target:** One happy-path browser flow (submit coordinates and date; assert visible moon/sun results) per milestone or release. Tools and CI patterns: TestStrategy **Tools → E2E** and **Automation Strategies**.
+**Coverage target:** Real **Chromium** sessions against **Vite** with **`moon-api` on 8080** (same proxy layout as local dev). Automated specs live under [`src/frontend/e2e/`](src/frontend/e2e/). Full suite breakdown, Vitest vs Playwright scope, and local commands: [E2ETestPlan.md](E2ETestPlan.md).
+
+**CI:** Pull requests run **`npm run test:e2e`** in [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) (builds `moon-api`, starts it on **8080**, installs Chromium, then Playwright).
+
+| Case ID | Priority | Spec / focus | Description | Expected result |
+|---------|----------|----------------|-------------|-----------------|
+| **E2E-01** | P0 | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — smoke | Seattle lat/lon, date **2026-04-05**, UTC **12:00** → **Compute** | **Phase** heading, **`.moon-phase-svg`**, **Sun position** heading visible; **Illumination** shows **Local time**, **UTC** pill toggles **UTC:** line, **Local** restores local line (live **`/api/moon`** & **`/api/sun`** via proxy). |
+| **E2E-02** | P1 | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — geocoder stub | City search with **`**/nominatim.openstreetmap.org/search**`** fulfilled as a fake Paris hit | Latitude/longitude inputs match stub (**48.8566**, **2.3522**); no real OSM call. |
+| **E2E-03** | P1 | [`accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) | Same compute fixture as E2E-01, then **`@axe-core/playwright`** (`AxeBuilder`) | **Zero** axe violations with **`color-contrast`** disabled (intentional for dark-theme demos; see E2E test plan). |
+
+**Global setup:** [`global-setup.ts`](src/frontend/e2e/global-setup.ts) asserts **`moon-api`** health before tests (default **`MOON_API_HEALTH_URL`**).
 
 ---
 
@@ -134,7 +144,7 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 | Phase | Activities | Exit criterion |
 |-------|--------------|----------------|
 | **A — Core correctness** | Implement BE-01–BE-05, HTTP-01–HTTP-08 as automated tests where feasible | Ephemeris and API behaviors reproducible in CI or documented manual script. |
-| **B — UI and integration** | FE-01–FE-05; optional Vite + `moon-api` check for real `/api`; optional E2E for one fixture; **DO-01**–**DO-02** for Docker smoke | Demo path works on local dev and Docker; packaged stack responds to health and sample moon. |
+| **B — UI and integration** | FE-01–FE-05; Vitest suites with mocked HTTP; Playwright **E2E-01**–**E2E-03** in CI (**`e2e.yml`**); **DO-01**–**DO-02** for Docker smoke | Demo path works on local dev and Docker; packaged stack responds to health and sample moon; browser E2E passes against live API in CI. |
 | **C — Hardening** | BE-02 polar cases, HTTP-09, FE-06; fuzz a small set of bad inputs | No crashes; errors remain JSON-shaped. |
 
 Adjust phases to match course deadlines; **P0** cases should complete before final demo.
@@ -173,9 +183,9 @@ For a solo project, one person covers all roles but still uses the checklists.
 
 | Deliverable | Description |
 |-------------|-------------|
-| Automated tests | C++ test binaries / `ctest` (`moon_ephemeris_tests`, `moon_api_tests`); frontend **Vitest** suite; optional **`curl`**/API scripts. |
-| CI configuration | **GitHub Actions** (or equivalent) running build + unit/API tests; optional Docker smoke (see [TestStrategy.md](TestStrategy.md) § Automation Strategies). |
-| Runbook | README commands sufficient to run tests locally; this plan updated if cases change. |
+| Automated tests | C++ test binaries / `ctest` (`moon_ephemeris_tests`, `moon_api_tests`); frontend **Vitest** suite; **Playwright** specs under `src/frontend/e2e/`; optional **`curl`**/API scripts. |
+| CI configuration | **GitHub Actions**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (frontend, backend, Docker smoke); [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) (Playwright E2E). See [TestStrategy.md](TestStrategy.md) § Automation Strategies. |
+| Runbook | README + [E2ETestPlan.md](E2ETestPlan.md) for Vitest vs Playwright; this plan updated if cases change. |
 | Metrics baselines (optional) | If required for the course or a public deployment: capture entries from [TestStrategy.md](TestStrategy.md) § Metrics (e.g. API timing, uptime, visitor counts). |
 
 ---
@@ -186,7 +196,7 @@ For a solo project, one person covers all roles but still uses the checklists.
 |------|------------|
 | Float drift across platforms | Fix tolerance; avoid over-precise golden values from external almanacs. |
 | No CI | Run P0 matrix manually before each submission; add CI when time allows. |
-| E2E flakiness | Prefer API tests; keep E2E to one stable fixture. |
+| E2E flakiness | Prefer API/unit tests for contracts; Playwright uses fixed fixtures + health gate in **`global-setup`**; keep additional browser cases stable and minimal. |
 | Semantic misunderstanding (UTC day vs local) | Anchor tests to README “Time and semantics”; add fixture comments. |
 
 ---
@@ -197,7 +207,7 @@ For a solo project, one person covers all roles but still uses the checklists.
 |--------------------|----------------|
 | Correctness | §2 T1–T4, §4.1–§4.2 case matrices |
 | Regression safety | §4.1–§4.2 |
-| Integration (HTTP, optional FE+API, Docker smoke) | §3 environments, §4.3, §5 phase B |
+| Integration (HTTP, FE+API, Docker smoke, browser E2E) | §3 environments, §4.3, §4.4, §5 phase B |
 | Fast feedback | §4.1–§4.2, §5 phase A |
 | Performance / operations metrics | [TestStrategy.md](TestStrategy.md) § Metrics; §4.5; optional baselines in §8 |
 
@@ -209,3 +219,4 @@ For a solo project, one person covers all roles but still uses the checklists.
 |------|--------|
 | *(initial)* | Test plan created; aligned with TestStrategy and README/Design. |
 | 2026-04-19 | Aligned with TestStrategy; restructured **§4** into **Test levels** (unit backend, unit frontend, integration, optional E2E, metrics) matching [TestStrategy.md](TestStrategy.md); integration/FE+API/Docker in schedule; Vitest/ctest deliverables; traceability and fixture reference updates; renumbered §5–§11. |
+| 2026-05-17 | **§4.4** expanded with Playwright cases **E2E-01**–**E2E-03** (smoke, stubbed Nominatim, axe); CI/env/deliverables/traceability updated for **`ci.yml`** + **`e2e.yml`**; cross-link [E2ETestPlan.md](E2ETestPlan.md). |

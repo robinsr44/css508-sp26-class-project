@@ -8,6 +8,7 @@ permissions:
   contents: read
 
 jobs:
+  # Vitest (*.test.tsx / *.test.ts per vite.config) + ESLint + Playwright E2E (real moon-api on 8080).
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -21,8 +22,37 @@ jobs:
           cache: npm
           cache-dependency-path: src/frontend/package-lock.json
       - run: npm ci
+
+      # Playwright flows hit /api → Vite proxies to moon-api; global-setup probes /api/health on 8080.
+      - name: Install toolchain for moon-api (Playwright prerequisite)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential cmake git
+      - name: Build moon-api
+        working-directory: ${{ github.workspace }}
+        run: |
+          cmake -S src/backend -B build-fe-ci
+          cmake --build build-fe-ci -j "$(nproc)" --target moon-api
+      - name: Start moon-api on port 8080
+        working-directory: ${{ github.workspace }}
+        run: |
+          ./build-fe-ci/moon-api 8080 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080/api/health >/dev/null; then
+              echo "moon-api ready"
+              exit 0
+            fi
+            sleep 0.25
+          done
+          echo "::error::moon-api failed to respond on /api/health"
+          exit 1
+
       - run: npm run lint
       - run: npm test -- --reporter=verbose
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Playwright E2E
+        env:
+          CI: true
+        run: npm run test:e2e
 
   backend:
     runs-on: ubuntu-latest

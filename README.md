@@ -32,6 +32,7 @@ You can run the stack **locally** (API on one port, Vite dev server with a proxy
 |------|--------|
 | **Dockerized Container Deployment** | From repo root: `docker compose up --build` → open **http://localhost:8080** |
 | **Develop UI + API on machine** | Terminal 1: build and run `moon-api` on **8080**. Terminal 2: `cd src/frontend && npm install && npm run dev` → open Vite’s URL (usually **http://127.0.0.1:5173**) |
+| **Browser E2E (Playwright)** | Start **`moon-api` on 8080** (matches Vite `/api` proxy). From `src/frontend`: **once** `npm run test:e2e:install`; then `npm run test:e2e` (Playwright starts Vite on **5173**). Full steps: **[E2E tests (Playwright)](#e2e-tests-playwright)** — also [`E2ETestPlan.md`](E2ETestPlan.md), [`TestReport.md`](TestReport.md). |
 
 ## Repository layout
 **Frontend** ([`src/frontend/`](src/frontend/)) — A **React** + **TypeScript** app built with **Vite**. The UI collects latitude, longitude, date, and UTC time, then calls **`/api/moon`** (via the dev-server proxy in development, or same-origin `/api` when served behind nginx in Docker). The API returns UTC instants; the UI maps the chosen coordinates to an IANA timezone with **[tz-lookup](https://www.npmjs.com/package/tz-lookup)** and formats moonrise/moonset and “instant” lines in **local** time for that location (UTC is still shown for reference). Presentation lives in [`src/frontend/src/App.tsx`](src/frontend/src/App.tsx), [`src/frontend/src/api.ts`](src/frontend/src/api.ts), and [`src/frontend/src/locationTime.ts`](src/frontend/src/locationTime.ts); styling uses component CSS. There is no client-side ephemeris: the browser only computes display timezones and displays JSON returned by the API.
@@ -208,6 +209,82 @@ Output: **`src/frontend/dist/`**. Serving that folder is optional for local work
 
 ---
 
+## E2E tests (Playwright)
+
+End-to-end specs live in [`src/frontend/e2e/`](src/frontend/e2e/). They use **Chromium** and hit the real **`/api`** stack (Vite dev server proxies to `moon-api`; see [`playwright.config.ts`](src/frontend/playwright.config.ts)). There is also a **Vitest** layer with mocked `fetch` for fast UI tests—**E2E** here means Playwright only.
+
+**What runs:** smoke (compute + illumination Local/UTC pills), stubbed Nominatim search, and an **axe-core** accessibility scan. Plan and suite names: [`E2ETestPlan.md`](E2ETestPlan.md); scenario detail: [`TestReport.md`](TestReport.md).
+
+### Prerequisites
+
+1. **Node** and **`src/frontend` dependencies**: `npm install` (or `npm ci`) in `src/frontend`.
+2. **`moon-api` listening where the UI will proxy `/api`** — by default **`http://127.0.0.1:8080`** ([`vite.config.ts`](src/frontend/vite.config.ts)).
+3. **Browser binaries (one time per machine):** from **`src/frontend`**:
+
+   ```bash
+   npm run test:e2e:install
+   ```
+
+   This installs **Chromium** (and deps on Linux CI via `--with-deps` in workflows).
+
+### Pre-flight health check
+
+Before any test, **`e2e/global-setup.ts`** calls **`MOON_API_HEALTH_URL`** (default **`http://127.0.0.1:8080/api/health`**) and requires JSON **`{"status":"ok"}`**. If this fails, start or fix **`moon-api`** first.
+
+### Default: Vite launched by Playwright (local dev setup)
+
+Terminal **1** — API (repository root):
+
+```bash
+cmake -S src/backend -B build && cmake --build build
+./build/moon-api 8080
+```
+
+Terminal **2** — E2E (no need to run `npm run dev` manually; Playwright starts Vite):
+
+```bash
+cd src/frontend
+npm run test:e2e
+```
+
+`playwright.config.ts` runs **`npm run dev -- --host 127.0.0.1 --port 5173`** as `webServer` unless you skip it (below). Tests open **`http://127.0.0.1:5173`** by default.
+
+**Useful variants**
+
+| Goal | Command (from `src/frontend`) |
+|------|-------------------------------|
+| Interactive / debug UI | `npm run test:e2e:ui` |
+| More console output | `npx playwright test --reporter=list,line` |
+
+### Already running the UI (Docker Compose or manual Vite)
+
+If the **full app + API** are reachable on one origin (same as Docker: **`http://127.0.0.1:8080`**), skip Playwright’s embedded Vite and point the browser at that base URL:
+
+```bash
+docker compose up --build -d moon-tracker   # repo root — example only; URL must match YOUR mapping
+cd src/frontend
+PLAYWRIGHT_SKIP_WEBSERVER=1 \
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 \
+MOON_API_HEALTH_URL=http://127.0.0.1:8080/api/health \
+npm run test:e2e
+```
+
+Adjust host/port if you changed Compose [`ports`](docker-compose.yml).
+
+### API on a non-default port
+
+If **`moon-api`** is **not** on **8080**, you must align **three** places:
+
+1. Start **`moon-api`** on your port (first CLI argument).
+2. **Either** change Vite’s proxy `target` in [`vite.config.ts`](src/frontend/vite.config.ts) **or** rely only on Compose/nginx where `/api` is already correct—Playwright follows whatever the SPA loads.
+3. Set **`MOON_API_HEALTH_URL`** to that host/port’s **`/api/health`** so `global-setup` passes.
+
+### CI
+
+Pull-request workflows run Playwright against a locally built **`moon-api`** on **8080**; see [.github/workflows/ci.yml](.github/workflows/ci.yml) and [.github/workflows/e2e.yml](.github/workflows/e2e.yml).
+
+---
+
 ## HTTP API reference
 
 Base path: **`/api`**. Responses are **JSON** with `Content-Type: application/json`. Errors use **400** / **500** with a body like `{"error":"..."}`.
@@ -364,6 +441,7 @@ curl -s -X POST http://127.0.0.1:8080/api/sun \
 | Port **8080** already in use | Use another port: `./build/moon-api 9090` and point Vite’s proxy at `9090`, or change Docker `ports` / nginx upstream in a fork. |
 | Docker build fails on network | Ensure Docker can reach the internet (base images, `npm install`, CMake `FetchContent`). |
 | Browser can’t reach API in dev | Start **`moon-api` first**; confirm Vite proxy target matches your API port. |
+| Playwright **global-setup** fails on `/api/health` | **`moon-api`** must be up on **`MOON_API_HEALTH_URL`** (default **http://127.0.0.1:8080/api/health**) before `npm run test:e2e`. See [E2E tests (Playwright)](#e2e-tests-playwright). |
 | Empty or wrong rise/set | Extreme latitudes may yield `always_up` / `always_down`; UTC-day semantics may differ from local almanacs. |
 
 ---

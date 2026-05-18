@@ -73,33 +73,147 @@ describe("App", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the main heading and loads version from the API", async () => {
+  it("renders the main heading", () => {
     render(<App />);
-
     expect(screen.getByRole("heading", { name: /moon tracker/i })).toBeInTheDocument();
-    expect(await screen.findByText(/moon-api/)).toBeInTheDocument();
   });
 
   it("submits the form and shows moon phase from mocked API responses", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await screen.findByText(/moon-api/);
+    await user.click(computeButton(container));
+
+    expect(await screen.findByText(/Waning Gibbous/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Sun position/i })).toBeInTheDocument();
+    // FE-04: local time labels when tz-lookup resolves for Seattle coordinates
+    expect(screen.getAllByText(/Local time\s*:/i).length).toBeGreaterThan(0);
+  });
+
+  it('shows Waxing Crescent when eighth-bucket phase is still "New" but illumination exceeds 1%', async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/version")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ service: "moon-api", version: "1.1.0" }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        if (url.includes("/api/moon")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                ...moonApiBody,
+                phase: {
+                  name: "New",
+                  cycle_fraction: 0.054,
+                  sun_moon_earth_angle_deg: 33,
+                },
+                illumination: { fraction: 0.029, percent: 2.9 },
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+        if (url.includes("/api/sun")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(sunApiBody), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        return Promise.resolve(new Response("not found", { status: 404 }));
+      }),
+    );
+
+    const user = userEvent.setup();
+    const { container } = render(<App />);
 
     await user.click(computeButton(container));
 
-    expect(await screen.findByText("Waxing Gibbous")).toBeInTheDocument();
-    expect(screen.getByText(/Sun position/i)).toBeInTheDocument();
-    // FE-04: local time labels when tz-lookup resolves for Seattle coordinates
-    expect(screen.getAllByText(/Instant \(local\)/i).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Waxing Crescent/i)).toBeInTheDocument();
+  });
+
+  it('shows Waxing Gibbous when API phase is still "First Quarter" but illumination is well above half-lit', async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/version")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ service: "moon-api", version: "1.1.0" }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        if (url.includes("/api/moon")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                ...moonApiBody,
+                phase: {
+                  name: "First Quarter",
+                  cycle_fraction: 0.3,
+                  sun_moon_earth_angle_deg: 88,
+                },
+                illumination: { fraction: 0.72, percent: 72.0 },
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+        if (url.includes("/api/sun")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(sunApiBody), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        return Promise.resolve(new Response("not found", { status: 404 }));
+      }),
+    );
+
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(computeButton(container));
+
+    expect(await screen.findByText(/Waxing Gibbous/i)).toBeInTheDocument();
+  });
+
+  it("toggles result labels between local time and UTC", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(computeButton(container));
+
+    expect((await screen.findAllByText(/Local time\s*:/i)).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: /^UTC$/ }));
+    expect(screen.getByRole("button", { name: /^UTC$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByText(/^UTC\s*:/i).length).toBeGreaterThanOrEqual(2);
+    await user.click(screen.getByRole("button", { name: /^Local$/ }));
+    expect(screen.getAllByText(/Local time\s*:/i).length).toBeGreaterThan(0);
   });
 
   // TestPlan FE-01 — empty required fields: no submit, helper text
   it("disables Compute and shows hint when latitude, longitude, or date is empty", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
-
-    await screen.findByText(/moon-api/);
 
     const latInput = screen.getByLabelText(/latitude/i);
     await user.clear(latInput);
@@ -147,7 +261,6 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await screen.findByText(/moon-api/);
     await user.click(computeButton(container));
 
     const alert = await screen.findByRole("alert");
@@ -159,8 +272,6 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await screen.findByText(/moon-api/);
-
     await user.clear(screen.getByLabelText(/latitude/i));
     await user.type(screen.getByLabelText(/latitude/i), "91");
     await user.clear(screen.getByLabelText(/longitude/i));
@@ -169,32 +280,5 @@ describe("App", () => {
     await user.click(computeButton(container));
 
     expect(await screen.findByText(/No timezone found for these coordinates/i)).toBeInTheDocument();
-  });
-
-  // TestPlan FE-06 — copy URL feedback
-  it("Copy URL updates feedback after moon URL copy", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal(
-      "navigator",
-      new Proxy(globalThis.navigator, {
-        get(target, prop, receiver) {
-          if (prop === "clipboard") {
-            return { writeText };
-          }
-          return Reflect.get(target, prop, receiver);
-        },
-      }),
-    );
-
-    const user = userEvent.setup();
-    render(<App />);
-
-    await screen.findByText(/moon-api/);
-
-    const copyButtons = screen.getAllByRole("button", { name: /copy url/i });
-    await user.click(copyButtons[0]);
-
-    expect(writeText).toHaveBeenCalled();
-    expect(await screen.findByText(/^Copied$/)).toBeInTheDocument();
   });
 });

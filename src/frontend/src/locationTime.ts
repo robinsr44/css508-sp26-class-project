@@ -17,11 +17,24 @@ export function formatUtcIsoInZone(isoUtc: string, timeZone: string): string {
   try {
     return new Intl.DateTimeFormat(undefined, {
       timeZone,
-      dateStyle: "medium",
-      timeStyle: "medium",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
       timeZoneName: "short",
     }).format(d);
   } catch {
     return isoUtc;
   }
+}
+
+/** Format for the observation location, or UTC when no IANA zone is available. */
+export function formatInstantForDisplay(
+  isoUtc: string,
+  useGmt: boolean,
+  locationTimeZone: string | null,
+): string {
+  const zone = useGmt || !locationTimeZone ? "UTC" : locationTimeZone;
+  return formatUtcIsoInZone(isoUtc, zone);
 }

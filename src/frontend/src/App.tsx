@@ -1,17 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import "./App.css";
-import {
-  fetchMoon,
-  fetchSun,
-  fetchVersion,
-  type MoonApiResponse,
-  type SunApiResponse,
-  type VersionApiResponse,
-} from "./api";
-import { formatUtcIsoInZone, getPrimaryTimeZone } from "./locationTime";
+import { fetchMoon, fetchSun, type MoonApiResponse, type SunApiResponse } from "./api";
+import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
+import MoonPhase from "./MoonPhase";
+import { phaseDisplayName } from "./phaseDisplayName";
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
+}
+
+function azimuthToCompass(deg: number): string {
+  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  const normalized = ((deg % 360) + 360) % 360;
+  return dirs[Math.round(normalized / 22.5) % 16];
+}
+
+function hoursAboveHorizonText(hours: number): string {
+  const h = Math.round(hours);
+  if (h <= 0) return "less than an hour";
+  if (h === 1) return "about 1 hour";
+  return `about ${h} hours`;
 }
 
 export default function App() {
@@ -19,16 +27,24 @@ export default function App() {
   const [lon, setLon] = useState("-122.3321");
   const [date, setDate] = useState(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
   });
-  const [timeUtc, setTimeUtc] = useState("12:00");
+  const [timeUtc, setTimeUtc] = useState(() => {
+    const d = new Date();
+    return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<MoonApiResponse | null>(null);
   const [sunData, setSunData] = useState<SunApiResponse | null>(null);
-  const [version, setVersion] = useState<VersionApiResponse | null>(null);
-  const [showRawJson, setShowRawJson] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [showGmt, setShowGmt] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSearching, setLocationSearching] = useState(false);
+  const [locationSearchError, setLocationSearchError] = useState<string | null>(null);
+  const [resolvedLocationName, setResolvedLocationName] = useState<string | null>(null);
+  const locationSearchAbort = useRef<AbortController | null>(null);
 
   const canSubmit = useMemo(() => {
     return lat.trim() !== "" && lon.trim() !== "" && date.trim() !== "";
@@ -46,53 +62,59 @@ export default function App() {
     [coords],
   );
 
-  const queryParams = useMemo(() => {
-    const q = new URLSearchParams({
-      lat: lat.trim(),
-      lon: lon.trim(),
-      date: date.trim(),
-      time: timeUtc.trim(),
-    });
-    return q.toString();
-  }, [lat, lon, date, timeUtc]);
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setGeoError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setLocating(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude.toFixed(4));
+        setLon(pos.coords.longitude.toFixed(4));
+        setLocating(false);
+      },
+      (err) => {
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location access denied. Please allow location access and try again."
+            : "Unable to determine your location.",
+        );
+        setLocating(false);
+      },
+    );
+  }
 
-  const moonGetUrl = useMemo(() => {
-    if (typeof window === "undefined") return `/api/moon?${queryParams}`;
-    return new URL(`/api/moon?${queryParams}`, window.location.origin).href;
-  }, [queryParams]);
-
-  const sunGetUrl = useMemo(() => {
-    if (typeof window === "undefined") return `/api/sun?${queryParams}`;
-    return new URL(`/api/sun?${queryParams}`, window.location.origin).href;
-  }, [queryParams]);
-
-  const versionUrl = useMemo(() => {
-    if (typeof window === "undefined") return "/api/version";
-    return new URL("/api/version", window.location.origin).href;
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchVersion()
-      .then((v) => {
-        if (!cancelled) setVersion(v);
-      })
-      .catch(() => {
-        if (!cancelled) setVersion(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function copyToClipboard(label: string, text: string) {
+  async function searchLocation() {
+    const q = locationQuery.trim();
+    if (!q) return;
+    locationSearchAbort.current?.abort();
+    const controller = new AbortController();
+    locationSearchAbort.current = controller;
+    setLocationSearching(true);
+    setLocationSearchError(null);
+    setResolvedLocationName(null);
+    setGeoError(null);
     try {
-      await navigator.clipboard.writeText(text);
-      setCopyFeedback(label);
-      window.setTimeout(() => setCopyFeedback(null), 2000);
-    } catch {
-      setCopyFeedback("Copy failed");
-      window.setTimeout(() => setCopyFeedback(null), 2000);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+        { headers: { Accept: "application/json" }, signal: controller.signal },
+      );
+      if (!res.ok) throw new Error("Search request failed.");
+      const results = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
+      if (results.length === 0) {
+        setLocationSearchError(`No results found for "${q}". Try a more specific search.`);
+        return;
+      }
+      setLat(parseFloat(results[0].lat).toFixed(4));
+      setLon(parseFloat(results[0].lon).toFixed(4));
+      setResolvedLocationName(results[0].display_name);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      setLocationSearchError("Search failed. Check your connection or enter coordinates directly.");
+    } finally {
+      setLocationSearching(false);
     }
   }
 
@@ -123,21 +145,63 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>Moon tracker</h1>
-      <p className="subtitle">
-        Phase, illumination, and moonrise/moonset for a place and date, plus sun azimuth and altitude at your instant.
-        Enter the
-        observation time in <strong>UTC</strong>. Results show <strong>local time at your coordinates</strong> (IANA
-        timezone from a geographic lookup), with UTC in smaller text. The API still computes in UTC.
-      </p>
-      {version ? (
-        <p className="muted" style={{ marginTop: "-0.75rem", marginBottom: "1.25rem" }}>
-          API <code className="inline-code">{version.service}</code> version{" "}
-          <code className="inline-code">{version.version}</code>
+      <header className="app-header">
+        <h1>Moon tracker</h1>
+        <p className="subtitle">
+          Enter a location and date to see moon phase, moonrise/moonset times, and sun position.
         </p>
-      ) : null}
+      </header>
 
+      <main className="app-main">
       <form className="card" onSubmit={onSubmit}>
+        <div>
+          <label htmlFor="location-search">Location</label>
+          <div className="location-search-row">
+            <input
+              id="location-search"
+              type="search"
+              placeholder="City, e.g. Richmond, VA or Tokyo"
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void searchLocation();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn-search"
+              onClick={() => void searchLocation()}
+              disabled={locationSearching || !locationQuery.trim()}
+            >
+              {locationSearching ? "Searching…" : "Search"}
+            </button>
+          </div>
+          {resolvedLocationName ? (
+            <p className="input-hint location-resolved">{resolvedLocationName}</p>
+          ) : null}
+          {locationSearchError ? (
+            <p className="error location-error">{locationSearchError}</p>
+          ) : null}
+        </div>
+
+        <div className="location-alt-row">
+          <button type="button" className="btn-location" onClick={useMyLocation} disabled={locating}>
+            {locating ? "Locating…" : "Use my location"}
+          </button>
+          {geoError ? (
+            <p className="error" style={{ marginTop: "0.4rem", marginBottom: 0 }}>
+              {geoError}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="coords-divider">
+          <span>or enter coordinates</span>
+        </div>
+
         <div className="row">
           <div>
             <label htmlFor="lat">Latitude (°)</label>
@@ -156,6 +220,7 @@ export default function App() {
           <div>
             <label htmlFor="time">Time (UTC)</label>
             <input id="time" type="time" value={timeUtc} onChange={(e) => setTimeUtc(e.target.value)} />
+            <p className="input-hint">24-hour clock</p>
           </div>
         </div>
         <button type="submit" disabled={!canSubmit || loading}>
@@ -173,86 +238,56 @@ export default function App() {
         ) : null}
       </form>
 
-      {canSubmit ? (
-        <div className="card api-direct">
-          <h2 className="api-direct-title">Query the API directly</h2>
-          <p className="muted" style={{ marginTop: 0 }}>
-            Same parameters as the form: <code className="inline-code">GET</code> with query string, or{" "}
-            <code className="inline-code">POST</code> with JSON. Copy a URL and open it in a browser, or use{" "}
-            <code className="inline-code">curl</code>.
-          </p>
-          <div className="api-url-row">
-            <div>
-              <span className="api-label">Moon</span>
-              <code className="api-url">{moonGetUrl}</code>
-            </div>
+      {data || sunData ? (
+        <div className="time-zone-toggle">
+          <span className="tz-toggle-label">Times</span>
+          <div className="tz-pill" role="group" aria-label="Time display">
             <button
               type="button"
-              className="btn-secondary"
-              onClick={() => void copyToClipboard("moon", moonGetUrl)}
+              className={`pill-option${!showGmt ? " pill-active" : ""}`}
+              aria-pressed={!showGmt}
+              onClick={() => setShowGmt(false)}
             >
-              {copyFeedback === "moon" ? "Copied" : "Copy URL"}
+              Local
             </button>
-          </div>
-          <div className="api-url-row">
-            <div>
-              <span className="api-label">Sun</span>
-              <code className="api-url">{sunGetUrl}</code>
-            </div>
             <button
               type="button"
-              className="btn-secondary"
-              onClick={() => void copyToClipboard("sun", sunGetUrl)}
+              className={`pill-option${showGmt ? " pill-active" : ""}`}
+              aria-pressed={showGmt}
+              onClick={() => setShowGmt(true)}
             >
-              {copyFeedback === "sun" ? "Copied" : "Copy URL"}
+              UTC
             </button>
           </div>
-          <div className="api-url-row">
-            <div>
-              <span className="api-label">Version</span>
-              <code className="api-url">{versionUrl}</code>
-            </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => void copyToClipboard("version", versionUrl)}
-            >
-              {copyFeedback === "version" ? "Copied" : "Copy URL"}
-            </button>
-          </div>
-          <details className="curl-details">
-            <summary>Example curl commands</summary>
-            <pre className="api-pre">
-              {`curl -s "${moonGetUrl}"
-curl -s "${sunGetUrl}"
-curl -s "${versionUrl}"`}
-            </pre>
-          </details>
         </div>
       ) : null}
 
       {data ? (
         <div className="card result-grid">
-          <div className="result-item">
-            <h3>Phase</h3>
-            <p>
-              <strong>{data.phase.name}</strong>
-            </p>
-            <p className="muted">
-              Cycle fraction:{" "}
-              {typeof data.phase.cycle_fraction === "number"
-                ? data.phase.cycle_fraction.toFixed(4)
-                : "—"}
-            </p>
-            <p className="muted">
-              Sun–Moon–Earth angle:{" "}
-              {typeof data.phase.sun_moon_earth_angle_deg === "number"
-                ? `${data.phase.sun_moon_earth_angle_deg.toFixed(2)}°`
-                : "—"}
-            </p>
+          <div className="result-item phase-item">
+            {typeof data.phase.cycle_fraction === "number" &&
+            typeof data.illumination.fraction === "number" ? (
+              <MoonPhase
+                cycleFraction={data.phase.cycle_fraction}
+                illuminationFraction={data.illumination.fraction}
+                illuminationPercent={data.illumination.percent}
+                size={80}
+              />
+            ) : null}
+            <div>
+              <h2>Phase</h2>
+              <p>
+                <strong>{phaseDisplayName(data)}</strong>
+              </p>
+              {typeof data.phase.cycle_fraction === "number" ? (
+                <p className="muted">
+                  {(data.phase.cycle_fraction * 100).toFixed(1)}% through the current cycle
+                </p>
+              ) : null}
+            </div>
           </div>
           <div className="result-item">
-            <h3>Illumination</h3>
+            <h2>Illumination</h2>
             <p>
               <strong>
                 {typeof data.illumination.percent === "number"
@@ -261,64 +296,46 @@ curl -s "${versionUrl}"`}
               </strong>{" "}
               lit
             </p>
-            {locationTimeZone ? (
-              <>
-                <p>
-                  Instant (local): <strong>{formatUtcIsoInZone(data.instant_utc, locationTimeZone)}</strong>
-                </p>
-                <p className="muted">Instant (UTC): {data.instant_utc}</p>
-              </>
-            ) : (
-              <p className="muted">Instant (UTC): {data.instant_utc}</p>
-            )}
+            <p>
+              {showGmt ? "UTC" : "Local time"}:{" "}
+              <strong>{formatInstantForDisplay(data.instant_utc, showGmt, locationTimeZone)}</strong>
+            </p>
           </div>
           <div className="result-item">
-            <h3>Visibility</h3>
-            {locationTimeZone ? (
-              <p className="muted" style={{ marginTop: 0 }}>
-                Timezone: <code>{locationTimeZone}</code>. Rise/set from the API use the UTC calendar day of your selected
-                date.
-              </p>
-            ) : (
+            <h2>Visibility</h2>
+            {!locationTimeZone ? (
               <p className="muted" style={{ marginTop: 0 }}>
                 No timezone found for these coordinates; showing UTC only.
               </p>
-            )}
+            ) : null}
             {data.visibility.state === "normal" ? (
               <>
                 {data.visibility.moonrise_utc ? (
                   <p>
-                    Moonrise (local):{" "}
+                    {showGmt ? "Moonrise (UTC)" : "Moonrise"}:{" "}
                     <strong>
-                      {locationTimeZone
-                        ? formatUtcIsoInZone(data.visibility.moonrise_utc, locationTimeZone)
-                        : data.visibility.moonrise_utc}
+                      {formatInstantForDisplay(data.visibility.moonrise_utc, showGmt, locationTimeZone)}
                     </strong>
                   </p>
                 ) : null}
                 {data.visibility.moonset_utc ? (
                   <p>
-                    Moonset (local):{" "}
+                    {showGmt ? "Moonset (UTC)" : "Moonset"}:{" "}
                     <strong>
-                      {locationTimeZone
-                        ? formatUtcIsoInZone(data.visibility.moonset_utc, locationTimeZone)
-                        : data.visibility.moonset_utc}
+                      {formatInstantForDisplay(data.visibility.moonset_utc, showGmt, locationTimeZone)}
                     </strong>
                   </p>
                 ) : null}
-                {(data.visibility.moonrise_utc || data.visibility.moonset_utc) && locationTimeZone ? (
-                  <p className="muted">
-                    UTC: moonrise {data.visibility.moonrise_utc ?? "—"}, moonset {data.visibility.moonset_utc ?? "—"}
-                  </p>
-                ) : null}
                 {typeof data.visibility.hours_above_horizon === "number" ? (
-                  <p className="muted">Hours above horizon: {data.visibility.hours_above_horizon.toFixed(2)}</p>
+                  <p className="muted">
+                    Above the horizon for {hoursAboveHorizonText(data.visibility.hours_above_horizon)}
+                  </p>
                 ) : null}
               </>
             ) : data.visibility.state === "always_up" ? (
-              <p>Moon continuously above horizon that day (polar / high-latitude case).</p>
+              <p>The moon is above the horizon all day.</p>
             ) : (
-              <p>Moon continuously below horizon that day.</p>
+              <p>The moon is below the horizon all day.</p>
             )}
           </div>
         </div>
@@ -327,21 +344,19 @@ curl -s "${versionUrl}"`}
       {sunData ? (
         <div className="card result-grid">
           <div className="result-item">
-            <h3>Sun position</h3>
+            <h2>Sun position</h2>
             <p className="muted" style={{ marginTop: 0 }}>
-              Azimuth and altitude at your selected UTC instant (0° altitude ≈ horizon; low-precision suncalc-style model).
+              Azimuth and altitude at your selected time.
             </p>
-            {locationTimeZone ? (
-              <p>
-                Instant (local): <strong>{formatUtcIsoInZone(sunData.instant_utc, locationTimeZone)}</strong>
-              </p>
-            ) : null}
-            <p className="muted">Instant (UTC): {sunData.instant_utc}</p>
             <p>
-              Azimuth:{" "}
+              {showGmt ? "UTC" : "Local time"}:{" "}
+              <strong>{formatInstantForDisplay(sunData.instant_utc, showGmt, locationTimeZone)}</strong>
+            </p>
+            <p>
+              Direction:{" "}
               <strong>
                 {typeof sunData.position.azimuth_deg === "number"
-                  ? `${sunData.position.azimuth_deg.toFixed(2)}°`
+                  ? `${azimuthToCompass(sunData.position.azimuth_deg)} (${sunData.position.azimuth_deg.toFixed(1)}°)`
                   : "—"}
               </strong>
             </p>
@@ -349,34 +364,14 @@ curl -s "${versionUrl}"`}
               Altitude:{" "}
               <strong>
                 {typeof sunData.position.altitude_deg === "number"
-                  ? `${sunData.position.altitude_deg.toFixed(2)}°`
+                  ? `${sunData.position.altitude_deg.toFixed(1)}°`
                   : "—"}
               </strong>
             </p>
           </div>
         </div>
       ) : null}
-
-      {data && sunData ? (
-        <div className="card">
-          <label className="raw-toggle">
-            <input type="checkbox" checked={showRawJson} onChange={(e) => setShowRawJson(e.target.checked)} />
-            Show raw JSON from the API
-          </label>
-          {showRawJson ? (
-            <div className="raw-json-grid">
-              <div>
-                <h3 className="raw-json-heading">GET /api/moon</h3>
-                <pre className="api-pre">{JSON.stringify(data, null, 2)}</pre>
-              </div>
-              <div>
-                <h3 className="raw-json-heading">GET /api/sun</h3>
-                <pre className="api-pre">{JSON.stringify(sunData, null, 2)}</pre>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      </main>
     </div>
   );
 }
