@@ -107,13 +107,20 @@ After successful compute, runs **`@axe-core/playwright`** **`AxeBuilder`** with 
 
 ## CI (GitHub Actions)
 
-Pull-request workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+Pull-request workflows:
+
+**[`ci.yml`](.github/workflows/ci.yml)** — unit/integration-style checks:
 
 | Job | Role |
 |-----|------|
 | **frontend** | `npm ci`, `npm run lint`, **`npm test`** (Vitest, including happy-path / resilience tests). |
-| **backend** | CMake build, **ctest**, moon-api TCP smoke on **19090**, then **upload** `moon-api` binary as artifact **`moon-api-linux`**. |
-| **playwright-e2e** | **Needs backend.** Downloads **`moon-api-linux`**, runs it on **8080**, **`npm ci`** + **`npx playwright install chromium --with-deps`**, **`npm run test:e2e`** (Playwright starts Vite on **5173**). On failure, uploads **`playwright-report`** artifact for debugging. |
-| **container** | Docker image build + compose smoke (unchanged). |
+| **backend** | CMake build, **ctest**, moon-api TCP smoke on **19090**. |
+| **container** | Docker image build + compose smoke. |
 
-Vitest does **not** require the backend artifact. Playwright **does** (live `/api` traffic).
+**[`e2e.yml`](.github/workflows/e2e.yml)** — browser E2E (runs in parallel with CI jobs):
+
+| Job | Role |
+|-----|------|
+| **playwright** | CMake **build** `moon-api` only (no **ctest** here; backend job covers tests), runs it on **8080**, **`npm ci`** + **`npx playwright install chromium --with-deps`**, **`npm run test:e2e`** (Playwright starts Vite on **5173**). On failure, uploads **`playwright-report`** artifact for debugging. |
+
+Vitest does **not** require `moon-api`. Playwright uses a locally built **`moon-api`** in this workflow (live `/api` traffic).
