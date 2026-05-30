@@ -133,6 +133,11 @@ Runs once before browser workers start (not counted in the three test-case total
 **Checks:** No other Axe rule violations once results are rendered.
 
 ---
+### Suite H — Manual Testing
+Manual testing was conducted to make sure that the correct phases of the moon were showing
+up as expected. A single location was selected and recorded over a full lunar cycle.
+
+---
 
 ### E2E summary table
 
