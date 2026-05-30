@@ -73,6 +73,21 @@ describe("App", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows a collapsible disclaimer before the form", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    const disclaimer = container.querySelector("details.disclaimer");
+    expect(disclaimer).toBeTruthy();
+    expect(disclaimer).not.toHaveAttribute("open");
+
+    expect(screen.getByText(/Disclaimer — estimates only/i)).toBeVisible();
+
+    await user.click(screen.getByText(/Disclaimer — estimates only/i));
+    expect(disclaimer).toHaveAttribute("open");
+    expect(screen.getByText(/without warranty/i)).toBeVisible();
+    expect(screen.getByText(/do not use this app for navigation/i)).toBeVisible();
+  });
+
   it("renders the main heading and loads version from the API", async () => {
     render(<App />);
 

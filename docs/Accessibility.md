@@ -30,7 +30,7 @@ Moon Tracker targets **WCAG 2.1 Level AA**, aligned with **Section 508** (WCAG 2
 
 ## Known limits
 
-- Ephemeris output is **educational**, not for navigation (see README).
+- Ephemeris output is **educational**, not for navigation; see the collapsible **Disclaimer** (summary line visible when closed) and README.
 - **Color contrast** in jsdom unit tests is disabled (axe needs canvas); Playwright E2E-03 is the source of truth for contrast.
 - Location search / geolocation (FE-11, FE-12) are not in the UI yet; add axe + keyboard tests when those ship.
 

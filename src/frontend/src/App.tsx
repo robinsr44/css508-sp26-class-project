@@ -145,6 +145,24 @@ export default function App() {
         observation time in <strong>UTC</strong>. Results show <strong>local time at your coordinates</strong> (IANA
         timezone from a geographic lookup), with UTC in smaller text. The API still computes in UTC.
       </p>
+
+      <details className="disclaimer">
+        <summary className="disclaimer-summary">
+          Disclaimer — estimates only; not for navigation or safety decisions
+        </summary>
+        <div className="disclaimer-body">
+          <p>
+            Moon and sun times shown here are <strong>estimates for learning and general interest</strong>. They use a
+            low-precision astronomical model with a clear-sky assumption (no weather or atmospheric effects).
+          </p>
+          <p>
+            <strong>Do not use this app for navigation, safety decisions, or mission planning.</strong> Verify important
+            times with official almanacs or other trusted sources. Data is provided <strong>as is</strong>, without
+            warranty; you use it at your own risk.
+          </p>
+        </div>
+      </details>
+
       {version ? (
         <p className="muted" style={{ marginTop: "-0.75rem", marginBottom: "1.25rem" }}>
           API <code className="inline-code">{version.service}</code> version{" "}
@@ -196,8 +214,9 @@ export default function App() {
       </form>
 
       {canSubmit ? (
-        <div className="card api-direct">
-          <h2 className="api-direct-title">Query the API directly</h2>
+        <details className="card api-direct">
+          <summary className="api-direct-summary">Query the API directly</summary>
+          <div className="api-direct-body">
           <p className="muted" style={{ marginTop: 0 }}>
             Same parameters as the form: <code className="inline-code">GET</code> with query string, or{" "}
             <code className="inline-code">POST</code> with JSON. Copy a URL and open it in a browser, or use{" "}
@@ -258,7 +277,8 @@ curl -s "${sunGetUrl}"
 curl -s "${versionUrl}"`}
             </pre>
           </details>
-        </div>
+          </div>
+        </details>
       ) : null}
 
       {data ? (

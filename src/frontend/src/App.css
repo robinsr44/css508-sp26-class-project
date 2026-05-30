@@ -52,9 +52,57 @@ h1 {
 }
 
 .subtitle {
-  margin: 0 0 1.75rem;
+  margin: 0 0 1rem;
   color: var(--text-secondary);
   font-size: 0.95rem;
+}
+
+.disclaimer {
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 200, 120, 0.35);
+  background: rgba(255, 200, 120, 0.08);
+}
+
+.disclaimer-summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #f5d9a8;
+  list-style: none;
+}
+
+.disclaimer-summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclaimer-summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.disclaimer[open] .disclaimer-summary::before {
+  transform: rotate(90deg);
+}
+
+.disclaimer-body {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 200, 120, 0.2);
+}
+
+.disclaimer-body p {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.disclaimer-body p:last-child {
+  margin-bottom: 0;
 }
 
 .card {
@@ -156,10 +204,33 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.api-direct-title {
-  margin: 0 0 0.5rem;
+.api-direct-summary {
+  cursor: pointer;
   font-size: 1.05rem;
   font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-primary);
+  list-style: none;
+}
+
+.api-direct-summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-direct-summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.api-direct[open] .api-direct-summary::before {
+  transform: rotate(90deg);
+}
+
+.api-direct-body {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .api-url-row {
