@@ -11,7 +11,7 @@ import type { MoonApiResponse, SunApiResponse } from "./api";
 import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
 import { phaseDisplayName } from "./phaseDisplayName";
 import { buildMoonSunGoldenResponses } from "./test/ephemerisMirror";
-import { fillCoordinates, seedSeattleCoordinates } from "./test/locationForm";
+import { fillCoordinates } from "./test/locationForm";
 import { resultTimeDisplayGroup, useUtcTimeEntry } from "./test/timeToggle";
 
 function computeButton(container: HTMLElement) {
@@ -211,11 +211,10 @@ describe("happy path — moon cycle (mirror ephemeris)", () => {
     const { container } = render(<App />);
 
     await fillCoordinates(user, String(SEATTLE_LAT), String(SEATTLE_LON));
+    await useUtcTimeEntry(user);
 
     await user.clear(screen.getByLabelText(/^date(\s*\(local\)|\s*\(UTC\))?$/i));
     await user.type(screen.getByLabelText(/^date(\s*\(local\)|\s*\(UTC\))?$/i), dateStr);
-
-    await useUtcTimeEntry(user);
     await user.clear(screen.getByLabelText(/^time(\s*\(local\)|\s*\(UTC\))?$/i));
     await user.type(screen.getByLabelText(/^time(\s*\(local\)|\s*\(UTC\))?$/i), "12:00");
 

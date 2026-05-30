@@ -21,10 +21,11 @@ test.describe("keyboard navigation", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.getByRole("heading", { name: /^phase$/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^local$/i })).toBeVisible();
+    const timeDisplay = page.getByRole("group", { name: "Time display" });
+    await expect(timeDisplay.getByRole("button", { name: /^local$/i })).toBeVisible();
 
-    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^utc$/i }).focus();
-    await expect(page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^utc$/i })).toBeFocused();
+    await timeDisplay.getByRole("button", { name: /^utc$/i }).focus();
+    await expect(timeDisplay.getByRole("button", { name: /^utc$/i })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: /^sun position$/i }).locator("..").getByText(/^UTC\s*:/i)).toBeVisible();
   });

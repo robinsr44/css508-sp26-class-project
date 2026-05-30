@@ -23,13 +23,16 @@ test.describe("moon tracker smoke", () => {
     await expect(page.getByRole("heading", { name: /^sun position$/i })).toBeVisible();
 
     const illum = page.getByRole("heading", { name: /^illumination$/i }).locator("..");
-    await expect(illum.getByText(/Local time\s*:/i)).toBeVisible();
+    const timeDisplay = page.getByRole("group", { name: "Time display" });
 
-    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^UTC$/ }).click();
+    // UTC time entry shares the display toggle, so results start in UTC until Local is chosen.
     await expect(illum.getByText(/^UTC\s*:/i)).toBeVisible();
 
-    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^local$/i }).click();
+    await timeDisplay.getByRole("button", { name: /^local$/i }).click();
     await expect(illum.getByText(/Local time\s*:/i)).toBeVisible();
+
+    await timeDisplay.getByRole("button", { name: /^UTC$/ }).click();
+    await expect(illum.getByText(/^UTC\s*:/i)).toBeVisible();
 
     const visibility = page.getByRole("heading", { name: /^visibility$/i }).locator("..");
     await expect(visibility).toBeVisible();
@@ -43,7 +46,6 @@ test.describe("moon tracker smoke", () => {
       (await visibility.getByText(/Above the horizon for/i).count()) > 0;
     expect(hasRiseSet || hasPolarCopy || hasHoursLine).toBe(true);
 
-    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^UTC$/ }).click();
     const sun = page.getByRole("heading", { name: /^sun position$/i }).locator("..");
     await expect(sun.getByText(/^UTC\s*:/i)).toBeVisible();
     if (hasRiseSet) {
