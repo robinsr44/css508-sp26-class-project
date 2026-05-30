@@ -121,8 +121,23 @@ export default function App() {
     }
   }
 
+  const copyStatusMessage =
+    copyFeedback === "moon"
+      ? "Moon API URL copied to clipboard."
+      : copyFeedback === "sun"
+        ? "Sun API URL copied to clipboard."
+        : copyFeedback === "version"
+          ? "Version API URL copied to clipboard."
+          : copyFeedback === "Copy failed"
+            ? "Copy failed."
+            : null;
+
   return (
     <div className="app">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+      <main id="main-content">
       <h1>Moon tracker</h1>
       <p className="subtitle">
         Phase, illumination, and moonrise/moonset for a place and date, plus sun azimuth and altitude at your instant.
@@ -137,7 +152,11 @@ export default function App() {
         </p>
       ) : null}
 
-      <form className="card" onSubmit={onSubmit}>
+      <p id="form-hint" className="sr-only">
+        Enter latitude, longitude, date, and optional UTC time, then choose Compute. Results appear below the form.
+      </p>
+
+      <form className="card" onSubmit={onSubmit} aria-describedby="form-hint" aria-busy={loading}>
         <div className="row">
           <div>
             <label htmlFor="lat">Latitude (°)</label>
@@ -158,11 +177,14 @@ export default function App() {
             <input id="time" type="time" value={timeUtc} onChange={(e) => setTimeUtc(e.target.value)} />
           </div>
         </div>
-        <button type="submit" disabled={!canSubmit || loading}>
+        <button type="submit" disabled={!canSubmit || loading} aria-disabled={!canSubmit || loading}>
           {loading ? "Computing…" : "Compute"}
         </button>
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {loading ? "Loading moon and sun data." : ""}
+        </p>
         {!canSubmit ? (
-          <p className="muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+          <p id="form-required-hint" className="muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
             Fill in latitude, longitude, and date to compute.
           </p>
         ) : null}
@@ -189,6 +211,7 @@ export default function App() {
             <button
               type="button"
               className="btn-secondary"
+              aria-label="Copy Moon API URL"
               onClick={() => void copyToClipboard("moon", moonGetUrl)}
             >
               {copyFeedback === "moon" ? "Copied" : "Copy URL"}
@@ -202,6 +225,7 @@ export default function App() {
             <button
               type="button"
               className="btn-secondary"
+              aria-label="Copy Sun API URL"
               onClick={() => void copyToClipboard("sun", sunGetUrl)}
             >
               {copyFeedback === "sun" ? "Copied" : "Copy URL"}
@@ -215,11 +239,17 @@ export default function App() {
             <button
               type="button"
               className="btn-secondary"
+              aria-label="Copy version API URL"
               onClick={() => void copyToClipboard("version", versionUrl)}
             >
               {copyFeedback === "version" ? "Copied" : "Copy URL"}
             </button>
           </div>
+          {copyStatusMessage ? (
+            <p className="sr-only" role="status" aria-live="polite">
+              {copyStatusMessage}
+            </p>
+          ) : null}
           <details className="curl-details">
             <summary>Example curl commands</summary>
             <pre className="api-pre">
@@ -232,7 +262,10 @@ curl -s "${versionUrl}"`}
       ) : null}
 
       {data ? (
-        <div className="card result-grid">
+        <section className="card result-grid" aria-labelledby="moon-results-heading" aria-live="polite">
+          <h2 id="moon-results-heading" className="results-section-title">
+            Moon results
+          </h2>
           <div className="result-item">
             <h3>Phase</h3>
             <p>
@@ -321,11 +354,14 @@ curl -s "${versionUrl}"`}
               <p>Moon continuously below horizon that day.</p>
             )}
           </div>
-        </div>
+        </section>
       ) : null}
 
       {sunData ? (
-        <div className="card result-grid">
+        <section className="card result-grid" aria-labelledby="sun-results-heading">
+          <h2 id="sun-results-heading" className="results-section-title">
+            Sun results
+          </h2>
           <div className="result-item">
             <h3>Sun position</h3>
             <p className="muted" style={{ marginTop: 0 }}>
@@ -354,7 +390,7 @@ curl -s "${versionUrl}"`}
               </strong>
             </p>
           </div>
-        </div>
+        </section>
       ) : null}
 
       {data && sunData ? (
@@ -377,6 +413,7 @@ curl -s "${versionUrl}"`}
           ) : null}
         </div>
       ) : null}
+      </main>
     </div>
   );
 }

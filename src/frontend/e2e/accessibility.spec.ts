@@ -7,7 +7,7 @@ const DATE = "2026-04-05";
 const TIME = "12:00";
 
 test.describe("accessibility (E2E-03)", () => {
-  test("axe reports no violations (excluding color-contrast) after compute", async ({ page }) => {
+  test("axe reports no violations after compute", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel(/latitude/i).fill(LAT);
     await page.getByLabel(/longitude/i).fill(LON);
@@ -17,7 +17,7 @@ test.describe("accessibility (E2E-03)", () => {
 
     await expect(page.getByRole("heading", { name: /^phase$/i })).toBeVisible();
 
-    const results = await new AxeBuilder({ page }).disableRules(["color-contrast"]).analyze();
+    const results = await new AxeBuilder({ page }).analyze();
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
   });
 

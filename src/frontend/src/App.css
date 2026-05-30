@@ -10,9 +10,50 @@ h1 {
   margin: 0 0 0.35rem;
 }
 
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  background: #1a2a4a;
+  color: var(--text-primary);
+  border: 2px solid var(--focus-ring);
+  border-radius: 8px;
+  font-weight: 600;
+  z-index: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .subtitle {
   margin: 0 0 1.75rem;
-  color: #a8b0c4;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -30,7 +71,7 @@ label {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #8b93a8;
+  color: var(--text-label);
   margin-bottom: 0.35rem;
 }
 
@@ -50,10 +91,17 @@ input {
   width: 100%;
   padding: 0.55rem 0.65rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(0, 0, 0, 0.25);
   color: inherit;
   font-size: 1rem;
+}
+
+input:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 button {
@@ -63,17 +111,17 @@ button {
   border: none;
   cursor: pointer;
   font-weight: 600;
-  background: linear-gradient(135deg, #3d6fd8, #2a4fa0);
+  background: linear-gradient(135deg, #4a7ae8, #2f5cb8);
   color: #fff;
 }
 
 button:disabled {
-  opacity: 0.55;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
 .error {
-  color: #ff8a8a;
+  color: var(--text-error);
   font-size: 0.9rem;
   margin-top: 0.75rem;
 }
@@ -91,12 +139,12 @@ button:disabled {
 
 .result-item p {
   margin: 0.15rem 0;
-  color: #c8cfdc;
+  color: var(--text-secondary);
   font-size: 0.92rem;
 }
 
 .muted {
-  color: #7f8799;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -131,7 +179,7 @@ button:disabled {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #8b93a8;
+  color: var(--text-label);
   margin-bottom: 0.25rem;
 }
 
@@ -140,19 +188,19 @@ button:disabled {
   font-size: 0.78rem;
   word-break: break-all;
   line-height: 1.45;
-  color: #c5cad8;
+  color: var(--text-secondary);
 }
 
 .btn-secondary {
   margin-top: 1.4rem;
   padding: 0.45rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85rem;
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8eaf0;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
   flex-shrink: 0;
 }
 
@@ -166,7 +214,7 @@ button:disabled {
 
 .curl-details summary {
   cursor: pointer;
-  color: #a8b0c4;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -179,7 +227,7 @@ button:disabled {
   font-size: 0.78rem;
   line-height: 1.4;
   overflow-x: auto;
-  color: #c8cfdc;
+  color: var(--text-secondary);
 }
 
 .raw-toggle {
@@ -187,7 +235,7 @@ button:disabled {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  color: #c8cfdc;
+  color: var(--text-secondary);
   cursor: pointer;
   margin-bottom: 0.75rem;
 }
@@ -211,5 +259,11 @@ button:disabled {
   margin: 0 0 0.35rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #a8b0c4;
+  color: var(--text-muted);
+}
+
+.results-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
 }

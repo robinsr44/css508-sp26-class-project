@@ -191,10 +191,10 @@ describe("App", () => {
 
     await screen.findByText(/moon-api/);
 
-    const copyButtons = screen.getAllByRole("button", { name: /copy url/i });
-    await user.click(copyButtons[0]);
+    await user.click(screen.getByRole("button", { name: /copy moon api url/i }));
 
     expect(writeText).toHaveBeenCalled();
-    expect(await screen.findByText(/^Copied$/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy moon api url/i })).toHaveTextContent(/^Copied$/);
+    expect(await screen.findByText(/Moon API URL copied/i)).toBeInTheDocument();
   });
 });

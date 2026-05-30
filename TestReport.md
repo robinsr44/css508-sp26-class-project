@@ -8,7 +8,7 @@ This document summarizes automated test coverage and the **latest local verifica
 
 | Layer | Runner | Tests (last run) | Failed | Overall |
 |--------|--------|------------------|--------|---------|
-| Frontend unit / integration | Vitest (jsdom + Testing Library) | 39 | 0 | Passed |
+| Frontend unit / integration | Vitest (jsdom + Testing Library) | 42 | 0 | Passed |
 | Backend unit / integration | CTest / Google Test | 2 suites, all cases | 0 | Passed |
 | Live API fixture | `live-moon-fixture.sh` | 1 check | 0 | Passed |
 | API smoke (extended) | `moon-api-smoke.sh` | 8 checks | 0 | Passed |
@@ -31,6 +31,7 @@ This document summarizes automated test coverage and the **latest local verifica
 | [`App.resilience.test.tsx`](src/frontend/src/App.resilience.test.tsx) | Parallel failures (FE-08) | 2 |
 | [`App.display.test.tsx`](src/frontend/src/App.display.test.tsx) | Local/UTC labels, raw JSON (FE-09) | 2 |
 | [`App.formUx.test.tsx`](src/frontend/src/App.formUx.test.tsx) | Invalid coords, loading, re-submit (FE-10) | 3 |
+| [`App.a11y.test.tsx`](src/frontend/src/App.a11y.test.tsx) | axe + landmarks / copy button names | 3 |
 | [`api.test.ts`](src/frontend/src/api.test.ts) | Moon/sun/version client + edge cases | 17 |
 | [`locationTime.test.ts`](src/frontend/src/locationTime.test.ts) | Time zone helpers | 6 |
 
@@ -98,4 +99,5 @@ docker compose build moon-tracker && bash scripts/ci/docker-e2e.sh
 - [E2ETestPlan.md](E2ETestPlan.md)  
 - [TestStrategy.md](TestStrategy.md)  
 - [TestPlan.md](TestPlan.md)  
-- [docs/ManualTesting.md](docs/ManualTesting.md)
+- [docs/ManualTesting.md](docs/ManualTesting.md)  
+- [docs/Accessibility.md](docs/Accessibility.md)
