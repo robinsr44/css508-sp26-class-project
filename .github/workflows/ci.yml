@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test -- --reporter=verbose
+      # Browser E2E runs in .github/workflows/e2e.yml (Playwright + live moon-api).
 
   backend:
     runs-on: ubuntu-latest
@@ -39,12 +40,13 @@ jobs:
           ctest --test-dir build --output-on-failure -V
       # Integration: real moon-api process + TCP. Runs scripts/ci/moon-api-smoke.sh
       # (health, version, moon 200 shape, moon 400) — see script header for mapping.
-      - name: Smoke test moon-api binary (black-box)
+      - name: Smoke test moon-api binary (black-box + live fixture)
         run: |
           ./build/moon-api 19090 &
           echo $! > /tmp/moon-api.pid
           trap 'kill "$(cat /tmp/moon-api.pid)" 2>/dev/null || true; wait "$(cat /tmp/moon-api.pid)" 2>/dev/null || true' EXIT
           bash scripts/ci/moon-api-smoke.sh http://127.0.0.1:19090
+          bash scripts/ci/live-moon-fixture.sh http://127.0.0.1:19090
 
   container:
     runs-on: ubuntu-latest

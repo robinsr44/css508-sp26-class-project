@@ -9,7 +9,7 @@ This document is the **test plan** for the **moon tracker** class project: a Rea
 | Item | Value |
 |------|--------|
 | **Purpose** | Plan what to test, how, and when; record pass/fail criteria for releases and coursework milestones. |
-| **Related documents** | [TestStrategy.md](TestStrategy.md), [Design.md](Design.md), [README.md](README.md) |
+| **Related documents** | [TestStrategy.md](TestStrategy.md), [E2ETestPlan.md](E2ETestPlan.md), [Design.md](Design.md), [README.md](README.md) |
 | **Revision** | Update when routes, JSON shapes, or deployment paths change. |
 
 ---
@@ -94,6 +94,12 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 | FE-04 | P1 | Timezone resolution success | Local time labels shown per Design. |
 | FE-05 | P1 | Timezone lookup failure | Graceful UTC-only wording (Design). |
 | FE-06 | P2 | Copy URL / curl helpers | Clipboard or feedback behavior per Design. |
+| FE-07 | P0 | Visibility block (normal + polar) | Moonrise/moonset (local + UTC reference), hours above horizon, or polar copy. |
+| FE-08 | P0 | Parallel moon+sun failure | Either API failure shows `role="alert"`; no partial moon/sun results. |
+| FE-09 | P1 | Local + UTC labels on results | Moon, visibility, and sun show local instants and UTC lines; raw JSON toggle works. |
+| FE-10 | P1 | Form UX | Invalid lat/lon error; loading/disabled submit; failed re-submit clears results. |
+| FE-11 | P2 | Location search errors | *Deferred* until Nominatim search UI ships. |
+| FE-12 | P2 | Geolocation errors | *Deferred* until “Use my location” UI ships. |
 
 ---
 
@@ -114,12 +120,24 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 |-------|--------|
 | **HTTP black-box** | Same expectations as §4.1.2 against a process bound to a fixed port (CI or local). |
 | **Vite + `moon-api`** | Confirm `/api` proxy and paths when unit tests with mocks are insufficient. |
+| **INT-03** | Live Seattle fixture (`scripts/ci/live-moon-fixture.sh`) | `GET /api/moon` returns `visibility.state=normal` with rise/set for fixed query (aligns with E2E-01). |
+| **INT-04** | Extended `moon-api-smoke.sh` | `/api/sun` GET, POST moon/sun, default `time` → noon UTC. |
+| **MANUAL-01** | Lunar cycle visual check | [docs/ManualTesting.md](docs/ManualTesting.md) — manual gate, not CI. |
 
 ---
 
-### 4.4 E2E tests (optional)
+### 4.4 E2E tests (Playwright)
 
-**Coverage target:** One happy-path browser flow (submit coordinates and date; assert visible moon/sun results) per milestone or release. Tools and CI patterns: TestStrategy **Tools → E2E** and **Automation Strategies**.
+**Coverage target:** Real **Chromium** against **Vite** with **`moon-api` on 8080**. Specs: [`src/frontend/e2e/`](src/frontend/e2e/). Runbook: [E2ETestPlan.md](E2ETestPlan.md). CI: [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml).
+
+| Case ID | Priority | Description | Expected result |
+|---------|----------|-------------|-----------------|
+| **E2E-01** | P0 | Submit Seattle fixture → **Compute** | Phase, Visibility (rise/set + UTC line), Sun position; local and UTC instant labels visible. |
+| **E2E-02** | P0 | Stub `/api/moon` **400** | Alert with API error; no phase/visibility headings. |
+| **E2E-03** | P1 | Accessibility | Axe scan after compute (`color-contrast` disabled); compute via keyboard focus + Enter. |
+| **E2E-04** | P1 | Docker Compose browser smoke | [`scripts/ci/docker-e2e.sh`](scripts/ci/docker-e2e.sh) — Playwright smoke against nginx on **8080**. |
+
+**Global setup:** [`global-setup.ts`](src/frontend/e2e/global-setup.ts) requires healthy `moon-api` before specs run.
 
 ---
 
@@ -134,7 +152,7 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 | Phase | Activities | Exit criterion |
 |-------|--------------|----------------|
 | **A — Core correctness** | Implement BE-01–BE-05, HTTP-01–HTTP-08 as automated tests where feasible | Ephemeris and API behaviors reproducible in CI or documented manual script. |
-| **B — UI and integration** | FE-01–FE-05; optional Vite + `moon-api` check for real `/api`; optional E2E for one fixture; **DO-01**–**DO-02** for Docker smoke | Demo path works on local dev and Docker; packaged stack responds to health and sample moon. |
+| **B — UI and integration** | FE-01–FE-09; **INT-03** live fixture; **E2E-01**–**E2E-02** in CI; **DO-01**–**DO-02** for Docker smoke | Demo path works on local dev and Docker; browser E2E passes against live API. |
 | **C — Hardening** | BE-02 polar cases, HTTP-09, FE-06; fuzz a small set of bad inputs | No crashes; errors remain JSON-shaped. |
 
 Adjust phases to match course deadlines; **P0** cases should complete before final demo.
@@ -173,9 +191,9 @@ For a solo project, one person covers all roles but still uses the checklists.
 
 | Deliverable | Description |
 |-------------|-------------|
-| Automated tests | C++ test binaries / `ctest` (`moon_ephemeris_tests`, `moon_api_tests`); frontend **Vitest** suite; optional **`curl`**/API scripts. |
-| CI configuration | **GitHub Actions** (or equivalent) running build + unit/API tests; optional Docker smoke (see [TestStrategy.md](TestStrategy.md) § Automation Strategies). |
-| Runbook | README commands sufficient to run tests locally; this plan updated if cases change. |
+| Automated tests | C++ **`ctest`**; frontend **Vitest**; **Playwright** under `src/frontend/e2e/`; **`scripts/ci/`** smoke + live fixture. |
+| CI configuration | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (lint, Vitest, backend, Docker); [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) (Playwright). |
+| Runbook | README + [E2ETestPlan.md](E2ETestPlan.md); this plan updated if cases change. |
 | Metrics baselines (optional) | If required for the course or a public deployment: capture entries from [TestStrategy.md](TestStrategy.md) § Metrics (e.g. API timing, uptime, visitor counts). |
 
 ---
@@ -197,7 +215,7 @@ For a solo project, one person covers all roles but still uses the checklists.
 |--------------------|----------------|
 | Correctness | §2 T1–T4, §4.1–§4.2 case matrices |
 | Regression safety | §4.1–§4.2 |
-| Integration (HTTP, optional FE+API, Docker smoke) | §3 environments, §4.3, §5 phase B |
+| Integration (HTTP, live fixture, Docker smoke, browser E2E) | §3 environments, §4.3–§4.4, §5 phase B |
 | Fast feedback | §4.1–§4.2, §5 phase A |
 | Performance / operations metrics | [TestStrategy.md](TestStrategy.md) § Metrics; §4.5; optional baselines in §8 |
 
@@ -209,3 +227,5 @@ For a solo project, one person covers all roles but still uses the checklists.
 |------|--------|
 | *(initial)* | Test plan created; aligned with TestStrategy and README/Design. |
 | 2026-04-19 | Aligned with TestStrategy; restructured **§4** into **Test levels** (unit backend, unit frontend, integration, optional E2E, metrics) matching [TestStrategy.md](TestStrategy.md); integration/FE+API/Docker in schedule; Vitest/ctest deliverables; traceability and fixture reference updates; renumbered §5–§11. |
+| 2026-05-29 | High-priority gaps: **FE-07**–**FE-09**, **INT-03**, **E2E-01**–**E2E-02**; [E2ETestPlan.md](E2ETestPlan.md) and **`e2e.yml`** CI workflow. |
+| 2026-05-30 | Medium priority: **FE-10**, **INT-04**, sun POST parity, **E2E-03**–**E2E-04**, **MANUAL-01**; **FE-11**/**FE-12** deferred (no search/geo UI). |

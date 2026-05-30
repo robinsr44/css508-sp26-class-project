@@ -5,7 +5,10 @@
 //   HTTP-01 — MoonApiHealth.GetOk
 //   HTTP-02 — MoonApiVersion.GetHasServiceAndVersion
 //   HTTP-03 — MoonApiGetMoon.Valid200Shape
-//   HTTP-04 — MoonApiPostMoon.Valid200Shape, MoonApiParity.GetAndPostMoonMatchPhase
+//   HTTP-04 — MoonApiPostMoon.Valid200Shape, MoonApiParity.GetAndPostMoonMatchPhase,
+//             MoonApiGetMoon.DefaultTimeNoonWhenTimeOmitted
+//   HTTP-05 — MoonApiGetSun.Valid200Shape, MoonApiPostSun.Valid200Shape,
+//             MoonApiParity.GetAndPostSunMatchPosition
 //   HTTP-05 — MoonApiGetSun.Valid200Shape, MoonApiPostSun.Valid200Shape
 //   HTTP-06 — MoonApiGetMoon.MissingParams400
 //   HTTP-07 — LatLonOutOfRange400, InvalidLatLon400, Post lat/lon type errors
@@ -168,6 +171,20 @@ TEST(MoonApiGetMoon, LatLonOutOfRange400) {
 }
 
 // Valid query returns 200 and the documented top-level JSON keys.
+// Omitting time uses default 12:00 UTC (same instant as explicit time=12:00).
+TEST(MoonApiGetMoon, DefaultTimeNoonWhenTimeOmitted) {
+  auto cli = NewClient();
+  const auto r_default = cli.Get("/api/moon?lat=47.6&lon=-122.33&date=2024-06-15");
+  const auto r_noon =
+      cli.Get("/api/moon?lat=47.6&lon=-122.33&date=2024-06-15&time=12:00");
+  ASSERT_TRUE(r_default && r_noon);
+  EXPECT_EQ(r_default->status, 200);
+  EXPECT_EQ(r_noon->status, 200);
+  const auto j_def = nlohmann::json::parse(r_default->body);
+  const auto j_noon = nlohmann::json::parse(r_noon->body);
+  EXPECT_EQ(j_def["instant_utc"], j_noon["instant_utc"]);
+}
+
 TEST(MoonApiGetMoon, Valid200Shape) {
   auto cli = NewClient();
   const auto res =
@@ -334,6 +351,27 @@ TEST(MoonApiParity, GetAndPostMoonMatchPhase) {
   EXPECT_NEAR(jg["phase"]["cycle_fraction"].get<double>(),
               jp["phase"]["cycle_fraction"].get<double>(), kEpsFloat);
   EXPECT_EQ(jg["instant_utc"], jp["instant_utc"]);
+}
+
+// Equivalent GET and POST sun parameters yield the same position and instant.
+TEST(MoonApiParity, GetAndPostSunMatchPosition) {
+  auto cli = NewClient();
+  const auto r_get = cli.Get(
+      "/api/sun?lat=47.6&lon=-122.33&date=2024-06-15&time=12:00");
+  const auto r_post = cli.Post(
+      "/api/sun",
+      R"({"lat":47.6,"lon":-122.33,"date":"2024-06-15","time":"12:00"})",
+      "application/json");
+  ASSERT_TRUE(r_get && r_post);
+  EXPECT_EQ(r_get->status, 200);
+  EXPECT_EQ(r_post->status, 200);
+  const auto jg = nlohmann::json::parse(r_get->body);
+  const auto jp = nlohmann::json::parse(r_post->body);
+  EXPECT_EQ(jg["instant_utc"], jp["instant_utc"]);
+  EXPECT_NEAR(jg["position"]["azimuth_deg"].get<double>(),
+              jp["position"]["azimuth_deg"].get<double>(), kEpsFloat);
+  EXPECT_NEAR(jg["position"]["altitude_deg"].get<double>(),
+              jp["position"]["altitude_deg"].get<double>(), kEpsFloat);
 }
 
 int main(int argc, char** argv) {

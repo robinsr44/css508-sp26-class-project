@@ -9,7 +9,8 @@ This goal of this document is to outline the test strategy for this **moon track
 - `moon_api` and available HTTP routes (GET and POST)
 - Request and error response validation for the API
 - Verify the API-client behavior as well as display components
-- Some additional smoke tests for proof-of-life and sanity checking
+- **Browser E2E** — **Playwright** + Chromium against **Vite** with live **`moon-api`** (see [E2ETestPlan.md](E2ETestPlan.md))
+- Additional smoke tests for proof-of-life and sanity checking (API scripts, Docker, live fixture)
 
 
 # General Processes
@@ -25,15 +26,15 @@ The test strategy will follow a layered testing strategy with the following leve
 | Backend unit | **CMake** + **ctest**; **GoogleTest** or **Catch2** built from the same C++ code as `moon-api`. |
 | Frontend unit | **Vitest** (or Jest) with **jsdom** for TS/React tests under `src/frontend`. |
 | API / contract | `curl` sends the HTTP requests; `jq` picks fields out of the JSON. Either run those in a shell or wrap them in a small script. Run moon-api locally on a fixed port so tests always hit the same endpoint. |
-| E2E (optional) | Automated browser tests can hit your local dev or preview server while the API runs next to it; in CI, run the same stack via Docker Compose. |
+| E2E (browser) | **Playwright** + **Chromium** (`src/frontend/e2e/`): real clicks against **Vite** while **`moon-api` listens on 8080**. |
 | Packaging | **Docker** / **Docker Compose** for production-like smoke (`/api/health`, sample `/api/moon`). |
 
 ## Automation Strategies
 | Strategy | Description |
 |----------|-------------|
 | **Local** | Day to day: **CMake** for the backend, **npm** for the frontend. Full Docker builds are optional; see **README**. |
-| **CI** | **GitHub Actions** running unit and integration tests at minimum. |
-| **E2E** | Full-app checks for a realistic user path and overall behavior (when we add them). |
+| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — lint, Vitest, **ctest**, moon-api smoke, live fixture, Docker. [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) — Playwright on pull requests. |
+| **E2E** | Smoke compute + visibility (**E2E-01**); API error path (**E2E-02**). |
 | **Beta (stretch)** | Real people try the app and give feedback on design and usability. |
 
 # Test levels
@@ -70,8 +71,8 @@ The test strategy will follow a layered testing strategy with the following leve
 | **HTTP-01** | `MoonApiHealth.GetOk` |
 | **HTTP-02** | `MoonApiVersion.GetHasServiceAndVersion` |
 | **HTTP-03** | `MoonApiGetMoon.Valid200Shape` |
-| **HTTP-04** | `MoonApiPostMoon.Valid200Shape`, `MoonApiParity.GetAndPostMoonMatchPhase` |
-| **HTTP-05** | `MoonApiGetSun.Valid200Shape`, `MoonApiPostSun.Valid200Shape` |
+| **HTTP-04** | `MoonApiPostMoon.Valid200Shape`, `MoonApiParity.GetAndPostMoonMatchPhase`, `MoonApiGetMoon.DefaultTimeNoonWhenTimeOmitted` |
+| **HTTP-05** | `MoonApiGetSun.Valid200Shape`, `MoonApiPostSun.Valid200Shape`, `MoonApiParity.GetAndPostSunMatchPosition` |
 | **HTTP-06** | `MoonApiGetMoon.MissingParams400` |
 | **HTTP-07** | `MoonApiGetMoon.LatLonOutOfRange400`, `MoonApiGetMoon.InvalidLatLon400`, `MoonApiPostMoon.LatLonMustBeNumbers400` |
 | **HTTP-08** | `MoonApiGetMoon.InvalidDate400`, `MoonApiGetMoon.InvalidTime400`, `MoonApiPostMoon.InvalidJson400`, `MoonApiPostMoon.MissingKeys400`, `MoonApiPostMoon.DateMustBeString400` |
@@ -109,6 +110,12 @@ The test strategy will follow a layered testing strategy with the following leve
 | **FE-04** | `App.test.tsx`, `locationTime.test.ts` | `submits the form…` (expects local instant label) · `getPrimaryTimeZone` / `formatUtcIsoInZone` tests |
 | **FE-05** | `App.test.tsx` | `shows UTC-only copy when no timezone is found for coordinates` |
 | **FE-06** | `App.test.tsx` | `Copy URL updates feedback after moon URL copy` |
+| **FE-07** | `App.visibility.test.tsx` | Normal visibility (rise/set, hours, UTC line); `always_up` / `always_down` copy |
+| **FE-08** | `App.resilience.test.tsx` | Moon or sun failure → alert; no partial results |
+| **FE-09** | `App.display.test.tsx` | Local + UTC instants on moon/visibility/sun; raw JSON toggle |
+| **FE-10** | `App.formUx.test.tsx` | Invalid coordinates; loading state; failed re-submit clears results |
+| **FE-11** | — | *Deferred* (no location search UI) |
+| **FE-12** | — | *Deferred* (no geolocation UI) |
 
 ## Integration tests
 
@@ -117,6 +124,20 @@ Integration tests check **multiple layers at once**—more than a single functio
 - **HTTP API / contract** — Check GET and POST responses for an actual server that is running
 - **Frontend + API (optional)** — Optional: **Vite** plus a running **`moon-api`** so the browser uses real **`/api`** traffic (not mocks). Use when you still need to prove the proxy and paths work end-to-end.
 - **Packaging / deploy smoke** — Tests that the docker container is building correctly and contains the requisite components
+- **Live API fixture** — [`scripts/ci/live-moon-fixture.sh`](scripts/ci/live-moon-fixture.sh) (**INT-03**) on the Seattle E2E query
+- **Extended smoke** — [`scripts/ci/moon-api-smoke.sh`](scripts/ci/moon-api-smoke.sh) (**INT-04**): sun GET, POST routes, default UTC noon
+- **Manual lunar cycle** — [docs/ManualTesting.md](docs/ManualTesting.md) (**MANUAL-01**)
+
+## End-to-end (browser)
+
+E2E complements **Vitest** (mocked `fetch`) with **real Chromium**, **live `/api`** through the Vite proxy, and a **`global-setup`** health gate. See [E2ETestPlan.md](E2ETestPlan.md).
+
+| Case | Spec |
+|------|------|
+| **E2E-01** | [`e2e/smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — compute + visibility + sun labels |
+| **E2E-02** | [`e2e/errors.spec.ts`](src/frontend/e2e/errors.spec.ts) — stubbed moon **400** |
+| **E2E-03** | [`e2e/accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) — axe + keyboard submit |
+| **E2E-04** | [`scripts/ci/docker-e2e.sh`](scripts/ci/docker-e2e.sh) — Playwright via Docker Compose |
 
 # Metrics
 

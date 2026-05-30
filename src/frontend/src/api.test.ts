@@ -173,6 +173,50 @@ describe("fetchSun", () => {
       fetchSun({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
     ).rejects.toThrow(/Unexpected API response shape/);
   });
+
+  it("throws with server error message on non-OK JSON body", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse({ error: "bad sun" }, 502));
+
+    await expect(
+      fetchSun({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
+    ).rejects.toThrow("bad sun");
+  });
+
+  it("throws helpful message on network failure", async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(
+      fetchSun({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
+    ).rejects.toThrow(/Cannot reach the API/);
+  });
+});
+
+describe("fetchMoon edge cases", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("parses always_down visibility", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      jsonResponse({
+        ...validMoonBody,
+        visibility: { state: "always_down" },
+      }),
+    );
+
+    const out = await fetchMoon({
+      lat: 89,
+      lon: 0,
+      date: "2024-01-15",
+      timeUtc: "12:00",
+    });
+
+    expect(out.visibility.state).toBe("always_down");
+  });
 });
 
 describe("fetchVersion", () => {

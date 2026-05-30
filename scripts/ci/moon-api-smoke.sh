@@ -16,6 +16,9 @@
 #      state (HTTP-03 shape; aligns with ProjectSelection integration checklist).
 #   5. Moon validation path — GET /api/moon missing required date → 400 and
 #      JSON { "error": string } (HTTP-06 class behavior).
+#   6. Sun GET happy path — /api/sun shape (HTTP-05).
+#   7. POST /api/moon and POST /api/sun — 200 with expected keys (HTTP-04/05).
+#   8. Default UTC time — GET /api/moon without time matches time=12:00 (INT-04).
 #
 # Usage: moon-api-smoke.sh [base_url]
 # Example: moon-api-smoke.sh http://127.0.0.1:8080
@@ -83,6 +86,51 @@ import json
 with open('/tmp/smoke-moon-400.json') as f:
     j = json.load(f)
 assert 'error' in j and isinstance(j['error'], str)
+"
+
+# --- Test 6: sun GET success shape ---
+SUN_Q="lat=47.6062&lon=-122.3321&date=2026-04-05&time=12:00"
+curl -sf "${BASE}/api/sun?${SUN_Q}" -o /tmp/smoke-sun.json
+python3 -c "
+import json
+with open('/tmp/smoke-sun.json') as f:
+    j = json.load(f)
+assert 'instant_utc' in j and 'position' in j
+pos = j['position']
+assert 'azimuth_deg' in pos and 'altitude_deg' in pos
+"
+
+# --- Test 7: POST moon + sun ---
+curl -sf -X POST "${BASE}/api/moon" \
+  -H "Content-Type: application/json" \
+  -d '{"lat":47.6062,"lon":-122.3321,"date":"2026-04-05","time":"12:00"}' \
+  -o /tmp/smoke-moon-post.json
+curl -sf -X POST "${BASE}/api/sun" \
+  -H "Content-Type: application/json" \
+  -d '{"lat":47.6062,"lon":-122.3321,"date":"2026-04-05","time":"12:00"}' \
+  -o /tmp/smoke-sun-post.json
+python3 -c "
+import json
+for path, keys in (
+    ('/tmp/smoke-moon-post.json', ('phase', 'visibility')),
+    ('/tmp/smoke-sun-post.json', ('position',)),
+):
+    with open(path) as f:
+        j = json.load(f)
+    for k in keys:
+        assert k in j, (path, k, list(j.keys()))
+"
+
+# --- Test 8: default time noon when time omitted ---
+curl -sf "${BASE}/api/moon?lat=47.6062&lon=-122.3321&date=2026-04-05" -o /tmp/smoke-moon-default-time.json
+curl -sf "${BASE}/api/moon?${MOON_Q}" -o /tmp/smoke-moon-noon.json
+python3 -c "
+import json
+with open('/tmp/smoke-moon-default-time.json') as f:
+    j_def = json.load(f)
+with open('/tmp/smoke-moon-noon.json') as f:
+    j_noon = json.load(f)
+assert j_def['instant_utc'] == j_noon['instant_utc'], (j_def['instant_utc'], j_noon['instant_utc'])
 "
 
 echo "moon-api-smoke: OK (${BASE})"
