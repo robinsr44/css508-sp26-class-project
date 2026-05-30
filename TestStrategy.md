@@ -100,7 +100,7 @@ The test strategy will follow a layered testing strategy with the following leve
 
 **Tooling:** **Vitest** (fits Vite) or **Jest** with **jsdom**; colocate tests with sources or use `src/frontend/src/**/*.test.ts(x)`.
 
-**Representative unit tests** ([TestPlan.md](TestPlan.md) case IDs → Vitest in [`App.test.tsx`](src/frontend/src/App.test.tsx), [`api.test.ts`](src/frontend/src/api.test.ts), [`locationTime.test.ts`](src/frontend/src/locationTime.test.ts))
+**Representative unit tests** ([TestPlan.md](TestPlan.md) case IDs → Vitest in [`App.test.tsx`](src/frontend/src/App.test.tsx), [`App.visibility.test.tsx`](src/frontend/src/App.visibility.test.tsx), [`MoonPhase.test.tsx`](src/frontend/src/MoonPhase.test.tsx), [`phaseDisplayName.test.ts`](src/frontend/src/phaseDisplayName.test.ts), [`visibilityText.test.ts`](src/frontend/src/visibilityText.test.ts), [`test/ephemerisMirror.test.ts`](src/frontend/src/test/ephemerisMirror.test.ts), [`api.test.ts`](src/frontend/src/api.test.ts), [`locationTime.test.ts`](src/frontend/src/locationTime.test.ts))
 
 | Case ID | Test file | Test name(s) |
 |---------|-----------|----------------|
@@ -109,7 +109,7 @@ The test strategy will follow a layered testing strategy with the following leve
 | **FE-03** | `App.test.tsx`, `api.test.ts` | `shows API error message when moon request fails` · `fetchMoon > throws with server error message on non-OK JSON body` · `fetchMoon > throws on non-JSON error body` · `fetchMoon > throws on 200 with unexpected shape` · `fetchMoon > throws helpful message on network failure` |
 | **FE-04** | `App.test.tsx`, `locationTime.test.ts` | `submits the form…` (expects local instant label) · `getPrimaryTimeZone` / `formatUtcIsoInZone` tests |
 | **FE-05** | `App.test.tsx` | `shows UTC-only copy when no timezone is found for coordinates` |
-| **FE-06** | `App.test.tsx` | `Copy URL updates feedback after moon URL copy` |
+| **FE-06** | *(deferred)* | Copy URL / curl helpers described in Design are **not** in current `App.tsx`; covered manually or in a future feature PR. |
 
 ## Integration tests
 
@@ -127,7 +127,7 @@ E2E complements **Vitest** (fast, deterministic mocks) by exercising **real Chro
 | Topic | Approach |
 |-------|----------|
 | **Stack** | **`moon-api` on 8080**; Playwright starts **Vite** (embedded webServer) so **`/api`** is proxied like developer workflow. |
-| **Specs** | [`src/frontend/e2e/smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — happy-path compute + illumination pill toggles; city search with **`page.route`** stub for **Nominatim**. [`src/frontend/e2e/accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) — **AxeBuilder** after results render. |
+| **Specs** | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts), [`failure.spec.ts`](src/frontend/e2e/failure.spec.ts), [`location-search-failure.spec.ts`](src/frontend/e2e/location-search-failure.spec.ts), [`keyboard.spec.ts`](src/frontend/e2e/keyboard.spec.ts), [`accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) (axe; **color-contrast** off). **Docker:** [`docker-playwright.sh`](scripts/ci/docker-playwright.sh) in CI **container** job. |
 | **CI** | Workflow **[`e2e.yml`](.github/workflows/e2e.yml)** on **`pull_request`** (opened, synchronize, reopened). |
 | **Detail / commands** | [E2ETestPlan.md](E2ETestPlan.md) |
 

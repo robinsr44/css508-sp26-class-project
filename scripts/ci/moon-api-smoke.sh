@@ -16,6 +16,11 @@
 #      state (HTTP-03 shape; aligns with ProjectSelection integration checklist).
 #   5. Moon validation path — GET /api/moon missing required date → 400 and
 #      JSON { "error": string } (HTTP-06 class behavior).
+#   6. Sun GET happy path — GET /api/sun valid query; position fields present.
+#   7. Moon POST happy path — POST /api/moon JSON body → 200 with phase block.
+#   8. Sun POST happy path — POST /api/sun JSON body → 200 with position block.
+#   9. Default UTC time — GET without `time` matches explicit time=12:00 instant.
+#  10. GET/POST sun parity — azimuth and altitude match within tolerance.
 #
 # Usage: moon-api-smoke.sh [base_url]
 # Example: moon-api-smoke.sh http://127.0.0.1:8080
@@ -24,6 +29,11 @@ set -euo pipefail
 
 BASE="${1:-http://127.0.0.1:8080}"
 BASE="${BASE%/}"
+
+MOON_Q="lat=47.6062&lon=-122.3321&date=2026-04-05&time=12:00"
+MOON_Q_NO_TIME="lat=47.6062&lon=-122.3321&date=2026-04-05"
+MOON_POST_BODY='{"lat":47.6062,"lon":-122.3321,"date":"2026-04-05","time":"12:00"}'
+SUN_POST_BODY='{"lat":47.6062,"lon":-122.3321,"date":"2026-04-05","time":"12:00"}'
 
 # --- Test 1: wait for server (CI/Docker startup) ---
 echo "moon-api-smoke: waiting for ${BASE}/api/health ..."
@@ -57,7 +67,6 @@ assert j.get('version'), j
 "
 
 # --- Test 4: moon GET success shape ---
-MOON_Q="lat=47.6062&lon=-122.3321&date=2026-04-05&time=12:00"
 curl -sf "${BASE}/api/moon?${MOON_Q}" -o /tmp/smoke-moon.json
 python3 -c "
 import json
@@ -83,6 +92,75 @@ import json
 with open('/tmp/smoke-moon-400.json') as f:
     j = json.load(f)
 assert 'error' in j and isinstance(j['error'], str)
+"
+
+# --- Test 6: sun GET success shape ---
+curl -sf "${BASE}/api/sun?${MOON_Q}" -o /tmp/smoke-sun.json
+python3 -c "
+import json
+with open('/tmp/smoke-sun.json') as f:
+    j = json.load(f)
+assert 'instant_utc' in j and 'position' in j
+pos = j['position']
+assert 'azimuth_deg' in pos and 'altitude_deg' in pos
+"
+
+# --- Test 7: moon POST success shape ---
+code=$(curl -s -o /tmp/smoke-moon-post.json -w "%{http_code}" \
+  -X POST "${BASE}/api/moon" \
+  -H "Content-Type: application/json" \
+  -d "${MOON_POST_BODY}")
+if [[ "${code}" != "200" ]]; then
+  echo "moon-api-smoke: expected 200 for POST moon, got ${code}" >&2
+  cat /tmp/smoke-moon-post.json >&2 || true
+  exit 1
+fi
+python3 -c "
+import json
+with open('/tmp/smoke-moon-post.json') as f:
+    j = json.load(f)
+assert 'phase' in j and 'illumination' in j
+"
+
+# --- Test 8: sun POST success shape ---
+code=$(curl -s -o /tmp/smoke-sun-post.json -w "%{http_code}" \
+  -X POST "${BASE}/api/sun" \
+  -H "Content-Type: application/json" \
+  -d "${SUN_POST_BODY}")
+if [[ "${code}" != "200" ]]; then
+  echo "moon-api-smoke: expected 200 for POST sun, got ${code}" >&2
+  cat /tmp/smoke-sun-post.json >&2 || true
+  exit 1
+fi
+python3 -c "
+import json
+with open('/tmp/smoke-sun-post.json') as f:
+    j = json.load(f)
+assert 'position' in j
+"
+
+# --- Test 9: omitted time defaults to 12:00 UTC ---
+curl -sf "${BASE}/api/moon?${MOON_Q_NO_TIME}" -o /tmp/smoke-moon-default-time.json
+python3 -c "
+import json
+with open('/tmp/smoke-moon.json') as f:
+    j_explicit = json.load(f)
+with open('/tmp/smoke-moon-default-time.json') as f:
+    j_default = json.load(f)
+assert j_default['instant_utc'] == j_explicit['instant_utc'], (j_default, j_explicit)
+"
+
+# --- Test 10: GET/POST sun parity ---
+python3 -c "
+import json
+with open('/tmp/smoke-sun.json') as f:
+    jg = json.load(f)
+with open('/tmp/smoke-sun-post.json') as f:
+    jp = json.load(f)
+eps = 1e-4
+for k in ('azimuth_deg', 'altitude_deg'):
+    assert abs(jg['position'][k] - jp['position'][k]) < eps, (k, jg['position'][k], jp['position'][k])
+assert jg['instant_utc'] == jp['instant_utc']
 "
 
 echo "moon-api-smoke: OK (${BASE})"

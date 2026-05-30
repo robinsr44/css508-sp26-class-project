@@ -82,6 +82,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build production image
         run: docker compose build moon-tracker
-      # Integration: compose up + nginx/UI + API; TestPlan DO-01 / DO-02.
+      - name: Start Compose stack
+        run: docker compose up -d moon-tracker
+      # Integration: nginx/UI + API; TestPlan DO-01 / DO-02 + extended moon-api-smoke.
       - name: Docker integration smoke (DO-01, DO-02)
-        run: bash scripts/ci/docker-smoke.sh
+        run: |
+          bash scripts/ci/moon-api-smoke.sh http://127.0.0.1:8080
+          curl -sf "http://127.0.0.1:8080/" | grep -qE '<!DOCTYPE|<html'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Playwright E2E against Docker/nginx (packaging proxy)
+        working-directory: src/frontend
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+          bash ../../scripts/ci/docker-playwright.sh
+      - name: Tear down Compose stack
+        if: always()
+        run: docker compose down -v

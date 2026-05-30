@@ -29,6 +29,25 @@ test.describe("moon tracker smoke", () => {
 
     await page.getByRole("button", { name: /^local$/i }).click();
     await expect(illum.getByText(/Local time\s*:/i)).toBeVisible();
+
+    const visibility = page.getByRole("heading", { name: /^visibility$/i }).locator("..");
+    await expect(visibility).toBeVisible();
+    const hasRiseSet =
+      (await visibility.getByText(/^Moonrise/i).count()) > 0 ||
+      (await visibility.getByText(/^Moonset/i).count()) > 0;
+    const hasPolarCopy =
+      (await visibility.getByText(/above the horizon all day/i).count()) > 0 ||
+      (await visibility.getByText(/below the horizon all day/i).count()) > 0;
+    const hasHoursLine =
+      (await visibility.getByText(/Above the horizon for/i).count()) > 0;
+    expect(hasRiseSet || hasPolarCopy || hasHoursLine).toBe(true);
+
+    await page.getByRole("button", { name: /^UTC$/ }).click();
+    const sun = page.getByRole("heading", { name: /^sun position$/i }).locator("..");
+    await expect(sun.getByText(/^UTC\s*:/i)).toBeVisible();
+    if (hasRiseSet) {
+      await expect(visibility.getByText(/^Moonrise \(UTC\)/i)).toBeVisible();
+    }
   });
 
   test("location search fills coordinates when Nominatim returns a hit", async ({ page }) => {

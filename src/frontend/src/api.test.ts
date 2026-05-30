@@ -125,6 +125,50 @@ describe("fetchMoon", () => {
 
     expect(out.visibility.state).toBe("always_up");
   });
+
+  it("parses always_down visibility", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      jsonResponse({
+        ...validMoonBody,
+        visibility: { state: "always_down" },
+      }),
+    );
+
+    const out = await fetchMoon({
+      lat: 89,
+      lon: 0,
+      date: "2024-01-15",
+      timeUtc: "12:00",
+    });
+
+    expect(out.visibility.state).toBe("always_down");
+  });
+
+  it("parses normal visibility with hours_above_horizon", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      jsonResponse({
+        ...validMoonBody,
+        visibility: {
+          state: "normal",
+          moonrise_utc: "2024-06-15T08:00:00Z",
+          moonset_utc: "2024-06-16T04:00:00Z",
+          hours_above_horizon: 12.34,
+        },
+      }),
+    );
+
+    const out = await fetchMoon({
+      lat: 47.6,
+      lon: -122.33,
+      date: "2024-06-15",
+      timeUtc: "12:00",
+    });
+
+    expect(out.visibility.state).toBe("normal");
+    if (out.visibility.state === "normal") {
+      expect(out.visibility.hours_above_horizon).toBe(12.34);
+    }
+  });
 });
 
 describe("fetchSun", () => {
@@ -172,6 +216,34 @@ describe("fetchSun", () => {
     await expect(
       fetchSun({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
     ).rejects.toThrow(/Unexpected API response shape/);
+  });
+
+  it("throws with server error message on non-OK JSON body", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      jsonResponse({ error: "invalid sun params" }, 400),
+    );
+
+    await expect(
+      fetchSun({ lat: 0, lon: 0, date: "bad", timeUtc: "12:00" }),
+    ).rejects.toThrow("invalid sun params");
+  });
+
+  it("throws on non-JSON error body", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response("gateway timeout", { status: 502, headers: { "Content-Type": "text/plain" } }),
+    );
+
+    await expect(
+      fetchSun({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
+    ).rejects.toThrow(/HTTP 502/);
+  });
+
+  it("throws helpful message on network failure", async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(
+      fetchSun({ lat: 0, lon: 0, date: "2024-06-15", timeUtc: "12:00" }),
+    ).rejects.toThrow(/Cannot reach the API/);
   });
 });
 

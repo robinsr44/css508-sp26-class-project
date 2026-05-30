@@ -17,12 +17,18 @@ WORKDIR /src
 
 COPY src/backend/ ./backend/
 
-RUN cmake -S backend -B build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build -j"$(nproc)"
+# Configure + build: first cold build often takes 5–15 min (FetchContent git clones, then compile).
+# BuildKit may look "stuck" after "Found Threads: TRUE" while dependencies download with little log output.
+ENV CMAKE_BUILD_PARALLEL_LEVEL=4
+
+RUN --mount=type=cache,target=/src/build/_deps \
+    cmake -S backend -B build -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_QUIET=OFF \
+    && cmake --build build --target moon-api -j"$(nproc)" --verbose
 
 # Runs moon_ephemeris_tests and moon_api_tests during `docker build --target test-backend`.
 FROM backend-build AS test-backend
-RUN ctest --test-dir /src/build --output-on-failure
+RUN cmake --build /src/build --target moon_ephemeris_tests moon_api_tests -j"$(nproc)" \
+    && ctest --test-dir /src/build --output-on-failure
 
 FROM node:20-bookworm-slim AS frontend-build
 

@@ -35,8 +35,15 @@ Implementation references:
 |-------|------|
 | Location search + moon cycle | [`src/frontend/src/App.happyPath.test.tsx`](src/frontend/src/App.happyPath.test.tsx) |
 | Moon/sun partial failure | [`src/frontend/src/App.resilience.test.tsx`](src/frontend/src/App.resilience.test.tsx) |
-| Geolocation button | [`src/frontend/src/App.geolocation.test.tsx`](src/frontend/src/App.geolocation.test.tsx) |
-| Golden astrometry mirror | [`src/frontend/src/test/ephemerisMirror.ts`](src/frontend/src/test/ephemerisMirror.ts) |
+| Geolocation button | [`App.geolocation.test.tsx`](src/frontend/src/App.geolocation.test.tsx) (success, denied, unavailable, not supported) |
+| Nominatim failures | [`App.locationSearch.test.tsx`](src/frontend/src/App.locationSearch.test.tsx) |
+| Form UX | [`App.formUx.test.tsx`](src/frontend/src/App.formUx.test.tsx) |
+| API client (`fetchSun` errors) | [`api.test.ts`](src/frontend/src/api.test.ts) |
+| Golden astrometry mirror | [`src/frontend/src/test/ephemerisMirror.ts`](src/frontend/src/test/ephemerisMirror.ts), [`ephemerisMirror.test.ts`](src/frontend/src/test/ephemerisMirror.test.ts), optional live [`ephemerisMirror.live.test.ts`](src/frontend/src/test/ephemerisMirror.live.test.ts) |
+| Visibility UI + time toggle | [`App.visibility.test.tsx`](src/frontend/src/App.visibility.test.tsx) |
+| Moon disk thresholds | [`MoonPhase.test.tsx`](src/frontend/src/MoonPhase.test.tsx) |
+| Phase label bands | [`phaseDisplayName.test.ts`](src/frontend/src/phaseDisplayName.test.ts) |
+| Hours-above-horizon copy | [`visibilityText.test.ts`](src/frontend/src/visibilityText.test.ts) |
 
 ### Suite A — Location search → coordinates
 
@@ -61,7 +68,19 @@ Implementation references:
 
 ### Suite D — Use my location
 
-**Goal:** Stub **`navigator.geolocation.getCurrentPosition`** → lat/lon inputs filled (`40.7128`, `-74.0060`) and **Compute** still works with mocked `/api/moon` & `/api/sun`.
+**Goal:** Stub **`navigator.geolocation.getCurrentPosition`** → lat/lon inputs filled (`40.7128`, `-74.0060`) and **Compute** still works with mocked `/api/moon` & `/api/sun`. Also covers permission denied, position unavailable, and missing API.
+
+### Suite D2 — Nominatim failure paths
+
+**Goal:** Empty geocoder array, HTTP **503**, and network throw → user-visible **location-error** copy; coordinates unchanged on empty results.
+
+### Suite D3 — Form validation / loading
+
+**Goal:** Non-numeric lat/lon alert; **Computing…** disabled submit during delayed moon fetch; second submit failure clears prior Phase/Sun headings.
+
+### Suite B — Manual visual gate (not CI regression)
+
+The **29-day** Vitest parametrized run in [`App.happyPath.test.tsx`](src/frontend/src/App.happyPath.test.tsx) asserts **phase labels** and numeric sun strings against the ephemeris mirror. It does **not** verify SVG terminator geometry, animation, or pixel-level disk appearance. Before release/demo, optionally spot-check a few dates in a real browser (new → crescent → quarter → gibbous → full) and record sign-off in your runbook — treat this as **Manual Suite I**, not automated regression.
 
 ---
 
@@ -77,14 +96,31 @@ Specs: [`src/frontend/e2e/`](src/frontend/e2e/)
 1. Open `/`, fill Seattle coords, date **2026-04-05**, UTC **12:00**.
 2. **Compute** → **Phase** heading, `.moon-phase-svg`, **Sun position** heading visible.
 3. Illumination block: **Local time** visible → pill **UTC** → **UTC:** line → **Local** restores local line.
+4. **Visibility** block: moonrise/moonset, hours-above line, or polar copy; **UTC** pill updates rise/set labels and **Sun position** time label (**E2E-04**).
 
 ### Suite F — Location search with stubbed Nominatim (`smoke.spec.ts`)
 
 Intercepts **`**/nominatim.openstreetmap.org/search**`** with a fake Paris hit — asserts coords fill **without** calling real OSM.
 
+### Suite F2 — Location search failures (`location-search-failure.spec.ts`)
+
+Stub empty results and **503** responses; assert geocoder error copy in the UI.
+
+### Suite H — API failure UI (`failure.spec.ts`)
+
+Stub **`/api/moon`** with **400** JSON error; **Compute** → **`role="alert"`** shows message; no **Phase** heading (**E2E-05**). Does not require stopping `moon-api` (route intercept only).
+
 ### Suite G — Accessibility (`accessibility.spec.ts`)
 
-After successful compute, runs **`@axe-core/playwright`** **`AxeBuilder`** with **`color-contrast`** disabled (dark-theme demos often violate strict contrast budgets). Expect **zero** remaining violations.
+After successful compute, runs **`@axe-core/playwright`** **`AxeBuilder`** with **`color-contrast`** disabled (dark-theme demos often violate strict contrast budgets). Expect **zero** remaining violations. **Color-contrast** and full WCAG compliance are **out of scope** for CI; enable the rule locally when tuning theme tokens.
+
+### Suite G2 — Keyboard (`keyboard.spec.ts`)
+
+Focus **Compute**, submit with **Enter**, tab to **UTC** pill and activate with keyboard after results render.
+
+### Suite J — Docker / nginx E2E (CI `container` job)
+
+After **`docker compose up`**, [`scripts/ci/docker-playwright.sh`](scripts/ci/docker-playwright.sh) runs **`smoke.spec.ts`** and **`failure.spec.ts`** with **`PLAYWRIGHT_SKIP_WEBSERVER=1`** and **`PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080`** so packaging/proxy issues are caught in the browser, not only by [`moon-api-smoke.sh`](scripts/ci/moon-api-smoke.sh).
 
 ---
 
@@ -95,8 +131,9 @@ After successful compute, runs **`@axe-core/playwright`** **`AxeBuilder`** with 
 | DOM / React wiring | Yes | Yes |
 | Live moon-api & proxy | Mocked | Yes |
 | Real Chromium layout | jsdom only | Yes |
-| Nominatim | Mocked | Stubbed route (one test) |
-| Keyboard / a11y axe | Partial | Yes |
+| Nominatim | Mocked (empty/HTTP/network) | Stubbed happy + failure specs |
+| Keyboard / a11y axe | Form/loading tests | axe scan + keyboard.spec |
+| Lunar-cycle **visual** disk | Label strings only (Vitest) | **Manual Suite I** (see above) |
 
 ---
 
@@ -115,7 +152,7 @@ Pull-request workflows:
 |-----|------|
 | **frontend** | `npm ci`, `npm run lint`, **`npm test`** (Vitest, including happy-path / resilience tests). |
 | **backend** | CMake build, **ctest**, moon-api TCP smoke on **19090**. |
-| **container** | Docker image build + compose smoke. |
+| **container** | Docker image build, extended **`moon-api-smoke.sh`**, HTML check, **Playwright** via nginx (**Suite J**). |
 
 **[`e2e.yml`](.github/workflows/e2e.yml)** — browser E2E (runs in parallel with CI jobs):
 

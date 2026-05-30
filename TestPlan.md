@@ -74,6 +74,8 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 | HTTP-02 | P0 | `GET /api/version` | **200**, `service` and `version` present. |
 | HTTP-03 | P0 | `GET /api/moon` with valid `lat`, `lon`, `date`, optional `time` | **200**; body includes `instant_utc`, `location`, `phase`, `illumination`, `visibility`. |
 | HTTP-04 | P0 | `POST /api/moon` with same parameters as HTTP-03 | **200**; semantically same as GET within float tolerance. |
+| HTTP-04b | P1 | `GET`/`POST` `/api/sun` parity | Same azimuth/altitude within tolerance (`MoonApiParity.GetAndPostSunMatchPosition`). |
+| HTTP-04c | P1 | `GET /api/moon` with `time` omitted | Same `instant_utc` as explicit `time=12:00` (`MoonApiGetMoon.DefaultTimeMatchesExplicitNoon`). |
 | HTTP-05 | P0 | `GET` / `POST` `/api/sun` valid params | **200**; `position.azimuth_deg`, `position.altitude_deg` present. |
 | HTTP-06 | P0 | Missing required parameter (e.g. no `date`) | **400**, `{"error":"..."}`. |
 | HTTP-07 | P1 | Out-of-range `lat` or `lon` | **400** with clear error. |
@@ -93,7 +95,11 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 | FE-03 | P0 | API returns **400** or network failure | User-visible error from API body or generic message. |
 | FE-04 | P1 | Timezone resolution success | Local time labels shown per Design. |
 | FE-05 | P1 | Timezone lookup failure | Graceful UTC-only wording (Design). |
-| FE-06 | P2 | Copy URL / curl helpers | Clipboard or feedback behavior per Design. |
+| FE-06 | P2 | Copy URL / curl helpers | **Deferred** — not implemented in current `App.tsx` (see Design vs shipped UI). |
+| FE-07 | P1 | Nominatim empty / HTTP / network failure | Error copy in `App.locationSearch.test.tsx`. |
+| FE-08 | P1 | Geolocation denied / unavailable / not supported | Error copy in `App.geolocation.test.tsx`. |
+| FE-09 | P1 | Invalid lat/lon, loading state, failed re-submit | `App.formUx.test.tsx`. |
+| FE-10 | P1 | `fetchSun` HTTP/network/shape errors | `api.test.ts`. |
 
 ---
 
@@ -128,6 +134,12 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 | **E2E-01** | P0 | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — smoke | Seattle lat/lon, date **2026-04-05**, UTC **12:00** → **Compute** | **Phase** heading, **`.moon-phase-svg`**, **Sun position** heading visible; **Illumination** shows **Local time**, **UTC** pill toggles **UTC:** line, **Local** restores local line (live **`/api/moon`** & **`/api/sun`** via proxy). |
 | **E2E-02** | P1 | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — geocoder stub | City search with **`**/nominatim.openstreetmap.org/search**`** fulfilled as a fake Paris hit | Latitude/longitude inputs match stub (**48.8566**, **2.3522**); no real OSM call. |
 | **E2E-03** | P1 | [`accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) | Same compute fixture as E2E-01, then **`@axe-core/playwright`** (`AxeBuilder`) | **Zero** axe violations with **`color-contrast`** disabled (intentional for dark-theme demos; see E2E test plan). |
+| **E2E-04** | P1 | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts) — visibility | After compute, **Visibility** shows rise/set, hours line, or polar copy; **UTC** pill updates moonrise/moonset and **Sun position** labels. |
+| **E2E-05** | P1 | [`failure.spec.ts`](src/frontend/e2e/failure.spec.ts) | Stub **`/api/moon`** **400** | **`role="alert"`** shows API error; no **Phase** heading. |
+| **E2E-06** | P1 | [`location-search-failure.spec.ts`](src/frontend/e2e/location-search-failure.spec.ts) | Stub Nominatim empty / **503** | User-visible geocoder error copy. |
+| **E2E-07** | P2 | [`keyboard.spec.ts`](src/frontend/e2e/keyboard.spec.ts) | Tab + **Enter** on **Compute**; keyboard **UTC** pill | Results render; time label toggles. **Color-contrast** remains disabled in axe. |
+| **E2E-08** | P2 | CI **`container`** job + [`docker-playwright.sh`](scripts/ci/docker-playwright.sh) | Playwright vs **Compose/nginx** on **8080** | Smoke + failure specs pass through packaged proxy. |
+| **MAN-01** | P2 | Manual (documented in [E2ETestPlan.md](E2ETestPlan.md) Suite B) | Spot-check moon disk visuals across cycle | Not CI; 29-day Vitest covers labels only. |
 
 **Global setup:** [`global-setup.ts`](src/frontend/e2e/global-setup.ts) asserts **`moon-api`** health before tests (default **`MOON_API_HEALTH_URL`**).
 

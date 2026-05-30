@@ -4,6 +4,7 @@ import { fetchMoon, fetchSun, type MoonApiResponse, type SunApiResponse } from "
 import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
 import MoonPhase from "./MoonPhase";
 import { phaseDisplayName } from "./phaseDisplayName";
+import { hoursAboveHorizonText } from "./visibilityText";
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
@@ -13,13 +14,6 @@ function azimuthToCompass(deg: number): string {
   const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const normalized = ((deg % 360) + 360) % 360;
   return dirs[Math.round(normalized / 22.5) % 16];
-}
-
-function hoursAboveHorizonText(hours: number): string {
-  const h = Math.round(hours);
-  if (h <= 0) return "less than an hour";
-  if (h === 1) return "about 1 hour";
-  return `about ${h} hours`;
 }
 
 export default function App() {

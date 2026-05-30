@@ -12,8 +12,8 @@
 #
 # Tests performed
 #   DO-02 (via moon-api-smoke.sh on host port 8080)
-#     Same five checks as scripts/ci/moon-api-smoke.sh, but through the mapped
-#     host port so requests hit nginx → moon-api (proves location /api/ proxy).
+#     Extended black-box checks (moon/sun GET+POST, default UTC time) through
+#     nginx → moon-api. CI container job also runs Playwright against this URL.
 #   DO-01
 #     GET / on the same host:port returns HTML (SPA shell from static root +
 #     try_files), proving the packaged UI is served, not only the API.
