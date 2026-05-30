@@ -448,10 +448,23 @@ curl -s -X POST http://127.0.0.1:8080/api/sun \
 
 ## Attribution
 
-Ephemeris logic in `src/backend/src/moon_ephemeris.cpp` is derived from **[suncalc](https://github.com/mourner/suncalc)** (BSD-2-Clause). It is intended for **education and UI**, not navigation or mission planning.
+Third-party software, data, and services used by this project are summarized in
+**[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**. That file lists runtime npm
+and C++ dependencies (including versions and licenses), external APIs, and dev/test
+tools, and includes the full BSD-2-Clause text for SunCalc.
+
+| Topic | Source | Notes |
+|-------|--------|-------|
+| **Ephemeris** | [SunCalc](https://github.com/mourner/suncalc) (BSD-2-Clause, © 2011–2015 Vladimir Agafonkin) | Adapted in [`moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp); test mirror in [`ephemerisMirror.ts`](src/frontend/src/test/ephemerisMirror.ts). **UI/education only** — not navigation. |
+| **HTTP / JSON (API)** | [cpp-httplib](https://github.com/yhirose/cpp-httplib), [nlohmann/json](https://github.com/nlohmann/json) | Fetched at build time via CMake `FetchContent`. |
+| **UI runtime** | [React](https://react.dev/), [tz-lookup](https://github.com/darkskyapp/tz-lookup) (CC0) | `tz-lookup` uses [timezone-boundary-builder](https://github.com/evansiroky/timezone-boundary-builder) data (ODbL); approximate near borders. |
+| **Place search** | [Nominatim](https://nominatim.org/) / [OpenStreetMap](https://www.openstreetmap.org/copyright) | Browser-only; attribution shown in the UI. |
 
 ---
 
 ## License / course
 
-This repository is a **course project** for **CSS 508** (Spring 2026). Third-party libraries are subject to their respective licenses (see upstream projects).
+This repository is a **course project** for **CSS 508** (Spring 2026). Third-party
+components are subject to their respective licenses; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the inventory and SunCalc
+notice.

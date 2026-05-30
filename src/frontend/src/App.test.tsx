@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { fillCoordinates, seedSeattleCoordinates } from "./test/locationForm";
+import { resultTimeDisplayGroup } from "./test/timeToggle";
 
 function computeButton(container: HTMLElement) {
   const form = container.querySelector("form.card");
@@ -49,16 +51,22 @@ describe("App", () => {
           );
         }
         if (url.includes("/api/moon")) {
+          const u = new URL(url.startsWith("http") ? url : `http://localhost${url}`);
+          const lat = Number(u.searchParams.get("lat"));
+          const lon = Number(u.searchParams.get("lon"));
           return Promise.resolve(
-            new Response(JSON.stringify(moonApiBody), {
+            new Response(JSON.stringify({ ...moonApiBody, location: { latitude: lat, longitude: lon } }), {
               status: 200,
               headers: { "Content-Type": "application/json" },
             }),
           );
         }
         if (url.includes("/api/sun")) {
+          const u = new URL(url.startsWith("http") ? url : `http://localhost${url}`);
+          const lat = Number(u.searchParams.get("lat"));
+          const lon = Number(u.searchParams.get("lon"));
           return Promise.resolve(
-            new Response(JSON.stringify(sunApiBody), {
+            new Response(JSON.stringify({ ...sunApiBody, location: { latitude: lat, longitude: lon } }), {
               status: 200,
               headers: { "Content-Type": "application/json" },
             }),
@@ -82,6 +90,7 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     expect(await screen.findByText(/Waning Gibbous/i)).toBeInTheDocument();
@@ -138,6 +147,7 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     expect(await screen.findByText(/Waxing Crescent/i)).toBeInTheDocument();
@@ -191,6 +201,7 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     expect(await screen.findByText(/Waxing Gibbous/i)).toBeInTheDocument();
@@ -200,27 +211,33 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     expect((await screen.findAllByText(/Local time\s*:/i)).length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: /^UTC$/ }));
-    expect(screen.getByRole("button", { name: /^UTC$/ })).toHaveAttribute("aria-pressed", "true");
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^UTC$/ }));
+    expect(resultTimeDisplayGroup().getByRole("button", { name: /^UTC$/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(screen.getAllByText(/^UTC\s*:/i).length).toBeGreaterThanOrEqual(2);
-    await user.click(screen.getByRole("button", { name: /^Local$/ }));
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^Local$/ }));
     expect(screen.getAllByText(/Local time\s*:/i).length).toBeGreaterThan(0);
   });
 
-  // TestPlan FE-01 — empty required fields: no submit, helper text
-  it("disables Compute and shows hint when latitude, longitude, or date is empty", async () => {
+  // TestPlan FE-01 — compute without a location shows guidance
+  it("shows a hint when Compute is pressed without a location", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    const latInput = screen.getByLabelText(/latitude/i);
-    await user.clear(latInput);
-
     const compute = computeButton(container);
-    expect(compute).toBeDisabled();
-    expect(screen.getByText(/Fill in latitude, longitude, and date to compute/i)).toBeInTheDocument();
+    expect(compute).not.toBeDisabled();
+    await user.click(compute);
+
+    expect(
+      screen.getByText(/Set a location using search, your device location, or coordinates before computing/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^phase$/i })).not.toBeInTheDocument();
   });
 
   // TestPlan FE-03 — API error surfaces in UI
@@ -261,6 +278,7 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     const alert = await screen.findByRole("alert");
@@ -272,10 +290,7 @@ describe("App", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.clear(screen.getByLabelText(/latitude/i));
-    await user.type(screen.getByLabelText(/latitude/i), "91");
-    await user.clear(screen.getByLabelText(/longitude/i));
-    await user.type(screen.getByLabelText(/longitude/i), "0");
+    await fillCoordinates(user, "91", "0");
 
     await user.click(computeButton(container));
 

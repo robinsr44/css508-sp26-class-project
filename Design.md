@@ -12,9 +12,9 @@ The client is a single-page application under `src/frontend/`. It collects obser
 - **Sun results** — Sun azimuth and altitude at the selected instant, with local and UTC labeling where applicable.
 - **Timezone-aware display** — Resolves an IANA timezone from lat/lon and formats selected instants and rise/set strings for readability.
 - **API version** — On load, fetches `/api/version` and shows the service name and version when available.
-- **Direct API access** — Builds copyable absolute URLs for `GET /api/moon`, `GET /api/sun`, and `GET /api/version`, plus example `curl` commands.
-- **Raw JSON** — Optional pretty-printed view of the last moon and sun JSON responses for debugging or integration.
-- **Form validation and UX** — Basic numeric checks, loading state, disabled submit when inputs are incomplete, clipboard feedback for copy actions.
+- **Form validation and UX** — Basic numeric checks, loading state, disabled submit when inputs are incomplete.
+
+**Planned / not in current `App.tsx`:** copyable API URLs, example `curl` snippets, raw JSON debug panel, and clipboard feedback (see TestPlan **FE-06**, deferred).
 
 ### Client feature definitions
 
@@ -26,9 +26,9 @@ The client is a single-page application under `src/frontend/`. It collects obser
 | Sun results | Renders the sun JSON: **position** (**azimuth** and **altitude** in degrees at the requested UTC instant). The client does not compute ephemeris; values come from the API. |
 | Timezone-aware display | Uses **tz-lookup** on `(lat, lon)` to pick an **IANA timezone**, then **Intl.DateTimeFormat** to show API UTC instants as **local date/time strings** (and still shows UTC where noted). If lookup fails, the UI falls back to UTC-only wording. |
 | API version | Calls **`GET /api/version`** once on startup and displays **`service`** and **`version`** when the request succeeds; failures are ignored silently (no banner). |
-| Direct API access | Derives **same-origin** URLs with the current form query string so users or scripts can hit the API **outside** the form (browser address bar, `curl`, HTTP clients). Includes copy-to-clipboard and a collapsible **curl** snippet block. |
-| Raw JSON | Optional checkbox reveals **pretty-printed** `JSON.stringify` of the last successful moon and sun responses (mirrors what `GET` returned). |
-| Form validation and UX | Requires non-empty lat/lon/date before submit; validates lat/lon parse as finite numbers on submit; shows **loading** state during requests and **error** messages from failed network or HTTP error bodies; copy buttons show brief **Copied** / error feedback. |
+| Form validation and UX | Requires non-empty lat/lon/date before submit; validates lat/lon parse as finite numbers on submit; shows **loading** state during requests and **error** messages from failed network or HTTP error bodies. |
+
+*Deferred (documented for future work):* **Direct API access** (copyable URLs + `curl` examples), **Raw JSON** debug view.
 
 ### Moon phase illustration
 
@@ -107,7 +107,7 @@ From a **browser** on the same origin as the app (Vite or nginx), relative URLs 
 
 ## Computation layer
 
-The **computation layer** is the C++ translation unit **`moon_ephemeris`** ([`src/backend/src/moon_ephemeris.h`](src/backend/src/moon_ephemeris.h), [`src/backend/src/moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)). It lives in the **`moon` namespace**, has **no network or disk I/O**, and implements **low-precision, UI-grade** astronomy adapted from the **suncalc** family of algorithms (see source file attribution). The HTTP server (**`main.cpp`**) is the **only** caller in this project: it maps validated request parameters to these functions and serializes results as JSON.
+The **computation layer** is the C++ translation unit **`moon_ephemeris`** ([`src/backend/src/moon_ephemeris.h`](src/backend/src/moon_ephemeris.h), [`src/backend/src/moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)). It lives in the **`moon` namespace**, has **no network or disk I/O**, and implements **low-precision, UI-grade** astronomy adapted from **[SunCalc](https://github.com/mourner/suncalc)** (BSD-2-Clause; full notice in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)). The HTTP server (**`main.cpp`**) is the **only** caller in this project: it maps validated request parameters to these functions and serializes results as JSON.
 
 ### Computation structure (diagram)
 

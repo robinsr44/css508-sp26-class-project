@@ -72,12 +72,28 @@ export default function MoonPhase({
   const cx = size / 2;
   const cy = size / 2;
   const [entered, setEntered] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(mq.matches);
+    const onChange = (event: MediaQueryListEvent) => setReduceMotion(event.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setEntered(true);
+      return;
+    }
     setEntered(false);
     const t = window.setTimeout(() => setEntered(true), 40);
     return () => window.clearTimeout(t);
-  }, [cycleFraction, illuminationFraction, illuminationPercent]);
+  }, [cycleFraction, illuminationFraction, illuminationPercent, reduceMotion]);
 
   const k = Number(illuminationFraction);
   const solidFull = illuminationIndicatesFullMoon(k, illuminationPercent);
@@ -92,11 +108,15 @@ export default function MoonPhase({
       viewBox={`0 0 ${size} ${size}`}
       aria-hidden="true"
       className="moon-phase-svg"
-      style={{
-        opacity: entered ? 1 : 0,
-        transform: entered ? "scale(1)" : "scale(0.8)",
-        transition: "opacity 0.75s ease, transform 0.75s ease",
-      }}
+      style={
+        reduceMotion
+          ? undefined
+          : {
+              opacity: entered ? 1 : 0,
+              transform: entered ? "scale(1)" : "scale(0.8)",
+              transition: "opacity 0.75s ease, transform 0.75s ease",
+            }
+      }
     >
       <circle cx={cx} cy={cy} r={r} className="moon-disk-bg" />
       {solidFull ? (

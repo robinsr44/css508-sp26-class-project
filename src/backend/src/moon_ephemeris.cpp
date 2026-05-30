@@ -1,5 +1,7 @@
-// Ephemeris routines adapted from suncalc (BSD-2-Clause, Vladimir Agafonkin)
-// https://github.com/mourner/suncalc — low precision, suitable for UI.
+// Ephemeris routines adapted from SunCalc (BSD-2-Clause)
+// Copyright (c) 2011-2015, Vladimir Agafonkin — https://github.com/mourner/suncalc
+// Full license text: ../../../THIRD_PARTY_NOTICES.md (SunCalc section)
+// Low precision, suitable for UI — not for navigation or mission planning.
 
 #include "moon_ephemeris.h"
 

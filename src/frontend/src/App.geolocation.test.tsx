@@ -25,34 +25,38 @@ const sunOk: SunApiResponse = {
   position: { azimuth_deg: 0, altitude_deg: 30 },
 };
 
-describe("Use my location", () => {
-  beforeEach(() => {
-    Object.defineProperty(global.navigator, "geolocation", {
-      configurable: true,
-      writable: true,
-      value: {
-        getCurrentPosition: vi.fn((success: PositionCallback) => {
-          success({
-            coords: {
-              latitude: 40.7128,
-              longitude: -74.006,
-              accuracy: 10,
-              altitude: null,
-              altitudeAccuracy: null,
-              heading: null,
-              speed: null,
-            },
-            timestamp: Date.now(),
-          } as GeolocationPosition);
-        }),
-      },
-    });
+function stubGeolocation(
+  impl: (success: PositionCallback, error?: PositionErrorCallback) => void,
+) {
+  Object.defineProperty(global.navigator, "geolocation", {
+    configurable: true,
+    writable: true,
+    value: { getCurrentPosition: vi.fn(impl) },
   });
+}
 
+describe("Use my location", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     Reflect.deleteProperty(navigator, "geolocation");
+  });
+
+  beforeEach(() => {
+    stubGeolocation((success) => {
+      success({
+        coords: {
+          latitude: 40.7128,
+          longitude: -74.006,
+          accuracy: 10,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+        },
+        timestamp: Date.now(),
+      } as GeolocationPosition);
+    });
   });
 
   it("fills latitude and longitude from geolocation callback", async () => {
@@ -86,5 +90,64 @@ describe("Use my location", () => {
 
     await user.click(computeBtn(container));
     await screen.findByRole("heading", { name: /^phase$/i });
+  });
+
+  it("shows not-supported copy when geolocation is unavailable", async () => {
+    Reflect.deleteProperty(navigator, "geolocation");
+    Object.defineProperty(global.navigator, "geolocation", {
+      configurable: true,
+      value: undefined,
+    });
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /use my location/i }));
+
+    expect(
+      await screen.findByText(/Geolocation is not supported by your browser/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows permission-denied copy when the user blocks location access", async () => {
+    stubGeolocation((_success, error) => {
+      error?.({
+        code: 1,
+        message: "denied",
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      } as GeolocationPositionError);
+    });
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /use my location/i }));
+
+    expect(
+      await screen.findByText(/Location access denied/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows generic failure copy for other geolocation errors", async () => {
+    stubGeolocation((_success, error) => {
+      error?.({
+        code: 2,
+        message: "unavailable",
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      } as GeolocationPositionError);
+    });
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /use my location/i }));
+
+    expect(
+      await screen.findByText(/Unable to determine your location/i),
+    ).toBeInTheDocument();
   });
 });
