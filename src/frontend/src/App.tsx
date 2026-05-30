@@ -271,6 +271,41 @@ export default function App() {
         <p className="subtitle">
           Enter a location and date to see moon phase, moonrise/moonset times, and sun position.
         </p>
+        <details className="disclaimer">
+          <summary>Disclaimer — recreational use only</summary>
+          <div className="disclaimer-body">
+            <p>
+              <strong>Information for recreational purposes only.</strong> Moon phase, rise/set times,
+              and sun position shown here are estimates intended for general interest and casual
+              planning. They are not certified, verified, or suitable for any purpose requiring
+              precision.
+            </p>
+            <p>
+              <strong>Not for navigation or safety-related use.</strong> Do not rely on this tool for
+              aviation, maritime, driving, hiking, emergency response, astronomical observation, or
+              any activity where inaccurate timing or position could cause harm, property damage, or
+              regulatory non-compliance. This application is not a substitute for official almanacs,
+              nautical or aeronautical publications, government observatories, or other authoritative
+              sources.
+            </p>
+            <p>
+              <strong>No warranty.</strong> All content is provided &ldquo;as is&rdquo; and &ldquo;as
+              available,&rdquo; without warranties of any kind, whether express or implied, including
+              but not limited to accuracy, completeness, timeliness, or fitness for a particular
+              purpose.
+            </p>
+            <p>
+              <strong>Limitation of liability.</strong> To the fullest extent permitted by applicable
+              law, the operators of this tool disclaim all liability for any loss, injury, damage, or
+              adverse outcome arising from your use of or reliance on the information displayed.
+            </p>
+            <p>
+              <strong>Your responsibility.</strong> You are solely responsible for independently
+              confirming any information before acting on it and for complying with all applicable
+              laws, regulations, and safety requirements.
+            </p>
+          </div>
+        </details>
       </header>
 
       <main className="app-main">

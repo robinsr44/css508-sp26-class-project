@@ -11,9 +11,55 @@ h1 {
 }
 
 .subtitle {
-  margin: 0 0 1.75rem;
+  margin: 0 0 1rem;
   color: #a8b0c4;
   font-size: 0.95rem;
+}
+
+.disclaimer {
+  margin: 0 0 1.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 200, 100, 0.06);
+  border: 1px solid rgba(255, 200, 100, 0.18);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: #c8c4b8;
+}
+
+.disclaimer summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #e8c88a;
+  list-style: none;
+}
+
+.disclaimer summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclaimer summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.disclaimer[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.disclaimer p {
+  margin: 0.65rem 0 0;
+  line-height: 1.5;
+  color: #a8a498;
+}
+
+.disclaimer-body p:first-child {
+  margin-top: 0.75rem;
+}
+
+.disclaimer-body strong {
+  color: #d4c4a0;
+  font-weight: 600;
 }
 
 .card {
