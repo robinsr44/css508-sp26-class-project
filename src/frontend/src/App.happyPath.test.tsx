@@ -11,6 +11,8 @@ import type { MoonApiResponse, SunApiResponse } from "./api";
 import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
 import { phaseDisplayName } from "./phaseDisplayName";
 import { buildMoonSunGoldenResponses } from "./test/ephemerisMirror";
+import { fillCoordinates, seedSeattleCoordinates } from "./test/locationForm";
+import { resultTimeDisplayGroup, useUtcTimeEntry } from "./test/timeToggle";
 
 function computeButton(container: HTMLElement) {
   const form = container.querySelector("form.card");
@@ -102,9 +104,14 @@ describe("happy path — location search updates coordinates", () => {
           });
         }
         if (raw.includes("/api/moon")) {
+          const url = new URL(raw.startsWith("http") ? raw : `http://localhost${raw}`);
+          const lat = Number(url.searchParams.get("lat"));
+          const lon = Number(url.searchParams.get("lon"));
+          const date = url.searchParams.get("date") ?? "2026-01-15";
+          const time = url.searchParams.get("time") ?? "12:00";
           const moon: MoonApiResponse = {
-            instant_utc: "2026-01-15T12:00:00Z",
-            location: { latitude: 0, longitude: 0 },
+            instant_utc: `${date}T${time}:00Z`,
+            location: { latitude: lat, longitude: lon },
             phase: { name: "Full", cycle_fraction: 0.5, sun_moon_earth_angle_deg: 90 },
             illumination: { fraction: 1, percent: 100 },
             visibility: { state: "always_down" },
@@ -115,9 +122,14 @@ describe("happy path — location search updates coordinates", () => {
           });
         }
         if (raw.includes("/api/sun")) {
+          const url = new URL(raw.startsWith("http") ? raw : `http://localhost${raw}`);
+          const lat = Number(url.searchParams.get("lat"));
+          const lon = Number(url.searchParams.get("lon"));
+          const date = url.searchParams.get("date") ?? "2026-01-15";
+          const time = url.searchParams.get("time") ?? "12:00";
           const sun: SunApiResponse = {
-            instant_utc: "2026-01-15T12:00:00Z",
-            location: { latitude: 0, longitude: 0 },
+            instant_utc: `${date}T${time}:00Z`,
+            location: { latitude: lat, longitude: lon },
             position: { azimuth_deg: 0, altitude_deg: 30 },
           };
           return new Response(JSON.stringify(sun), {
@@ -152,6 +164,36 @@ describe("happy path — location search updates coordinates", () => {
     expect(screen.getByLabelText(/longitude/i)).toHaveValue(expectedLon);
     expect(computeButton(container)).not.toBeDisabled();
   });
+
+  it("compute resolves a typed city without clicking Search and shows that timezone in results", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.type(screen.getByPlaceholderText(/city/i), "Richmond, VA");
+    await useUtcTimeEntry(user);
+    await user.clear(screen.getByLabelText(/^date(\s*\(local\)|\s*\(UTC\))?$/i));
+    await user.type(screen.getByLabelText(/^date(\s*\(local\)|\s*\(UTC\))?$/i), "2026-05-30");
+    await user.clear(screen.getByLabelText(/^time(\s*\(local\)|\s*\(UTC\))?$/i));
+    await user.type(screen.getByLabelText(/^time(\s*\(local\)|\s*\(UTC\))?$/i), "03:27");
+
+    await user.click(computeButton(container));
+
+    expect((await screen.findAllByText(FIXTURES["Richmond, VA"].display_name)).length).toBeGreaterThan(0);
+    expect(document.querySelector(".result-location-name")).toHaveTextContent(
+      FIXTURES["Richmond, VA"].display_name,
+    );
+    expect(screen.getByLabelText(/latitude/i)).toHaveValue("37.5389");
+    expect(screen.getByLabelText(/longitude/i)).toHaveValue("-77.4338");
+
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^local$/i }));
+
+    const richmondTz = getPrimaryTimeZone(37.5388577, -77.4338395);
+    expect(richmondTz).toMatch(/New_York/);
+    const expectedLocal = formatInstantForDisplay("2026-05-30T03:27:00Z", false, richmondTz);
+    expect(screen.getAllByText(expectedLocal).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/PDT/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/EDT/i).length).toBeGreaterThan(0);
+  });
 });
 
 describe("happy path — moon cycle (mirror ephemeris)", () => {
@@ -168,16 +210,14 @@ describe("happy path — moon cycle (mirror ephemeris)", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.clear(screen.getByLabelText(/latitude/i));
-    await user.type(screen.getByLabelText(/latitude/i), String(SEATTLE_LAT));
-    await user.clear(screen.getByLabelText(/longitude/i));
-    await user.type(screen.getByLabelText(/longitude/i), String(SEATTLE_LON));
+    await fillCoordinates(user, String(SEATTLE_LAT), String(SEATTLE_LON));
 
-    await user.clear(screen.getByLabelText(/^date$/i));
-    await user.type(screen.getByLabelText(/^date$/i), dateStr);
+    await user.clear(screen.getByLabelText(/^date(\s*\(local\)|\s*\(UTC\))?$/i));
+    await user.type(screen.getByLabelText(/^date(\s*\(local\)|\s*\(UTC\))?$/i), dateStr);
 
-    await user.clear(screen.getByLabelText(/^time \(utc\)$/i));
-    await user.type(screen.getByLabelText(/^time \(utc\)$/i), "12:00");
+    await useUtcTimeEntry(user);
+    await user.clear(screen.getByLabelText(/^time(\s*\(local\)|\s*\(UTC\))?$/i));
+    await user.type(screen.getByLabelText(/^time(\s*\(local\)|\s*\(UTC\))?$/i), "12:00");
 
     await user.click(computeButton(container));
 
@@ -200,15 +240,15 @@ describe("happy path — moon cycle (mirror ephemeris)", () => {
     const illuminationBlock = screen.getByRole("heading", { name: /^illumination$/i }).closest(".result-item");
     expect(illuminationBlock).toBeTruthy();
 
-    const expectedLocal = formatInstantForDisplay(goldenMoon.instant_utc, false, tz);
-    expect(within(illuminationBlock!).getByText(expectedLocal)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /^UTC$/ }));
-
     const expectedUtcLine = formatInstantForDisplay(goldenMoon.instant_utc, true, tz);
     expect(within(illuminationBlock!).getByText(expectedUtcLine)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^local$/i }));
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^local$/i }));
+
+    const expectedLocal = formatInstantForDisplay(goldenMoon.instant_utc, false, tz);
     expect(within(illuminationBlock!).getByText(expectedLocal)).toBeInTheDocument();
+
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^UTC$/ }));
+    expect(within(illuminationBlock!).getByText(expectedUtcLine)).toBeInTheDocument();
   });
 });

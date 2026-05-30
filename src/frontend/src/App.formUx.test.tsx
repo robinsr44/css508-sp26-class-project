@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import type { MoonApiResponse, SunApiResponse } from "./api";
+import { fillCoordinates, seedSeattleCoordinates } from "./test/locationForm";
 
 function computeBtn(container: HTMLElement) {
   const form = container.querySelector("form.card");
@@ -37,8 +38,7 @@ describe("form validation and submit UX", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.clear(screen.getByLabelText(/latitude/i));
-    await user.type(screen.getByLabelText(/latitude/i), "not-a-number");
+    await fillCoordinates(user, "not-a-number", "-122.3321");
     await user.click(computeBtn(container));
 
     const alert = await screen.findByRole("alert");
@@ -75,6 +75,7 @@ describe("form validation and submit UX", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     const compute = computeBtn(container);
     await user.click(compute);
 
@@ -119,6 +120,7 @@ describe("form validation and submit UX", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    await seedSeattleCoordinates(user);
     await user.click(computeBtn(container));
     expect(await screen.findByRole("heading", { name: /^phase$/i })).toBeInTheDocument();
 

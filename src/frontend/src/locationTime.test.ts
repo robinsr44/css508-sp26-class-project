@@ -1,7 +1,13 @@
 // TestPlan FE-04 (timezone helpers): see TestStrategy.md.
 import { describe, expect, it, vi } from "vitest";
 
-import { formatInstantForDisplay, formatUtcIsoInZone, getPrimaryTimeZone } from "./locationTime";
+import {
+  formatInstantForDisplay,
+  formatUtcIsoInZone,
+  getPrimaryTimeZone,
+  localWallClockToUtc,
+  utcWallClockToLocal,
+} from "./locationTime";
 
 describe("getPrimaryTimeZone", () => {
   it("returns null when latitude is out of range", () => {
@@ -37,6 +43,31 @@ describe("formatInstantForDisplay", () => {
   it("falls back to UTC when no location zone and GMT not requested", () => {
     const iso = "2024-06-15T12:00:00.000Z";
     expect(formatInstantForDisplay(iso, false, null)).toBe(formatUtcIsoInZone(iso, "UTC"));
+  });
+});
+
+describe("localWallClockToUtc / utcWallClockToLocal", () => {
+  it("converts Richmond, VA local noon to UTC during EDT", () => {
+    const utc = localWallClockToUtc("2024-06-15", "12:00", "America/New_York");
+    expect(utc).toEqual({ dateUtc: "2024-06-15", timeUtc: "16:00" });
+    expect(utcWallClockToLocal(utc!.dateUtc, utc!.timeUtc, "America/New_York")).toEqual({
+      dateLocal: "2024-06-15",
+      timeLocal: "12:00",
+    });
+  });
+
+  it("converts Sunnyvale, CA local noon to UTC during PDT", () => {
+    const utc = localWallClockToUtc("2024-06-15", "12:00", "America/Los_Angeles");
+    expect(utc).toEqual({ dateUtc: "2024-06-15", timeUtc: "19:00" });
+    expect(utcWallClockToLocal(utc!.dateUtc, utc!.timeUtc, "America/Los_Angeles")).toEqual({
+      dateLocal: "2024-06-15",
+      timeLocal: "12:00",
+    });
+  });
+
+  it("rolls the UTC calendar date when local evening crosses midnight UTC", () => {
+    const utc = localWallClockToUtc("2024-06-15", "22:00", "America/Los_Angeles");
+    expect(utc).toEqual({ dateUtc: "2024-06-16", timeUtc: "05:00" });
   });
 });
 

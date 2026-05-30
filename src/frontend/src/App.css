@@ -131,6 +131,27 @@ button:disabled {
   background: rgba(255, 255, 255, 0.07);
 }
 
+.location-required-hint {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+}
+
+.result-location-name {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+  color: #c8d4e8;
+}
+
+.result-location {
+  grid-column: 1 / -1;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.result-location-coords {
+  margin: 0;
+}
+
 .btn-location {
   margin-top: 0.75rem;
   padding: 0.4rem 0.8rem;
@@ -198,6 +219,23 @@ button:disabled {
   background: rgba(255, 255, 255, 0.12);
   color: #e8eaf0;
   font-weight: 600;
+}
+
+.time-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.time-zone-toggle--inline {
+  margin-bottom: 0;
+  gap: 0.45rem;
+}
+
+.time-zone-toggle--inline .tz-pill {
+  transform: scale(0.92);
+  transform-origin: right center;
 }
 
 /* ── Result cards ── */

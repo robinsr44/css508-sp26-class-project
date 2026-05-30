@@ -11,8 +11,9 @@ test.describe("accessibility", () => {
 
     await page.getByLabel(/latitude/i).fill("47.6062");
     await page.getByLabel(/longitude/i).fill("-122.3321");
-    await page.getByLabel(/^date$/i).fill("2026-04-05");
-    await page.getByLabel(/^time \(utc\)$/i).fill("12:00");
+    await page.getByRole("group", { name: "Time entry" }).getByRole("button", { name: /^UTC$/i }).click();
+    await page.getByLabel(/^date(\s*\(local\)|\s*\(UTC\))?$/i).fill("2026-04-05");
+    await page.getByLabel(/^time(\s*\(local\)|\s*\(UTC\))?$/i).fill("12:00");
     await page.getByRole("button", { name: /compute/i }).click();
 
     await expect(page.getByRole("heading", { name: /^phase$/i })).toBeVisible();

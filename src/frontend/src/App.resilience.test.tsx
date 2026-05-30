@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import type { MoonApiResponse, SunApiResponse } from "./api";
+import { seedSeattleCoordinates } from "./test/locationForm";
 
 function computeBtn(container: HTMLElement) {
   const form = container.querySelector("form.card");
@@ -53,6 +54,7 @@ describe("API resilience (Promise.all moon + sun)", () => {
     );
 
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeBtn(container));
 
     const alert = await screen.findByRole("alert");
@@ -83,6 +85,7 @@ describe("API resilience (Promise.all moon + sun)", () => {
     );
 
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeBtn(container));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/sun rejected/i);

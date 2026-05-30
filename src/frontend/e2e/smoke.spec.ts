@@ -11,8 +11,9 @@ test.describe("moon tracker smoke", () => {
 
     await page.getByLabel(/latitude/i).fill("47.6062");
     await page.getByLabel(/longitude/i).fill("-122.3321");
-    await page.getByLabel(/^date$/i).fill("2026-04-05");
-    await page.getByLabel(/^time \(utc\)$/i).fill("12:00");
+    await page.getByRole("group", { name: "Time entry" }).getByRole("button", { name: /^UTC$/i }).click();
+    await page.getByLabel(/^date(\s*\(local\)|\s*\(UTC\))?$/i).fill("2026-04-05");
+    await page.getByLabel(/^time(\s*\(local\)|\s*\(UTC\))?$/i).fill("12:00");
 
     await page.getByRole("button", { name: /compute/i }).click();
 
@@ -24,10 +25,10 @@ test.describe("moon tracker smoke", () => {
     const illum = page.getByRole("heading", { name: /^illumination$/i }).locator("..");
     await expect(illum.getByText(/Local time\s*:/i)).toBeVisible();
 
-    await page.getByRole("button", { name: /^UTC$/ }).click();
+    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^UTC$/ }).click();
     await expect(illum.getByText(/^UTC\s*:/i)).toBeVisible();
 
-    await page.getByRole("button", { name: /^local$/i }).click();
+    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^local$/i }).click();
     await expect(illum.getByText(/Local time\s*:/i)).toBeVisible();
 
     const visibility = page.getByRole("heading", { name: /^visibility$/i }).locator("..");
@@ -42,7 +43,7 @@ test.describe("moon tracker smoke", () => {
       (await visibility.getByText(/Above the horizon for/i).count()) > 0;
     expect(hasRiseSet || hasPolarCopy || hasHoursLine).toBe(true);
 
-    await page.getByRole("button", { name: /^UTC$/ }).click();
+    await page.getByRole("group", { name: "Time display" }).getByRole("button", { name: /^UTC$/ }).click();
     const sun = page.getByRole("heading", { name: /^sun position$/i }).locator("..");
     await expect(sun.getByText(/^UTC\s*:/i)).toBeVisible();
     if (hasRiseSet) {

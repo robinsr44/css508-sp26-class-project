@@ -46,7 +46,7 @@ describe("location search (Nominatim)", () => {
     expect(
       await screen.findByText(/No results found for "Nowhereville XYZ"/i),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/latitude/i)).toHaveValue("47.6062");
+    expect(screen.getByLabelText(/latitude/i)).toHaveValue("");
   });
 
   it("shows search-failed copy when Nominatim returns a non-OK status", async () => {

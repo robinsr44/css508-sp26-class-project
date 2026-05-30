@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { formatInstantForDisplay, getPrimaryTimeZone } from "./locationTime";
+import { seedSeattleCoordinates } from "./test/locationForm";
+import { resultTimeDisplayGroup } from "./test/timeToggle";
 
 function computeButton(container: HTMLElement) {
   const form = container.querySelector("form.card");
@@ -77,6 +79,7 @@ describe("App visibility UI", () => {
   it("shows moonrise, moonset, and hours above horizon for normal visibility", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     const block = screen.getByRole("heading", { name: /^visibility$/i }).closest(".result-item");
@@ -103,6 +106,7 @@ describe("App visibility UI", () => {
 
     const user = userEvent.setup();
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     expect(
@@ -123,6 +127,7 @@ describe("App visibility UI", () => {
 
     const user = userEvent.setup();
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     expect(
@@ -133,6 +138,7 @@ describe("App visibility UI", () => {
   it("toggles moonrise/moonset labels between Local and UTC", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     const block = await screen.findByRole("heading", { name: /^visibility$/i });
@@ -140,11 +146,11 @@ describe("App visibility UI", () => {
     expect(screen.getByText(/^Moonrise:/i)).toBeInTheDocument();
     expect(screen.queryByText(/^Moonrise \(UTC\)/i)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^UTC$/ }));
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^UTC$/ }));
     expect(screen.getByText(/^Moonrise \(UTC\)/i)).toBeInTheDocument();
     expect(screen.getByText(/^Moonset \(UTC\)/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Local$/ }));
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^Local$/ }));
     expect(screen.getByText(/^Moonrise:/i)).toBeInTheDocument();
     expect(screen.queryByText(/^Moonrise \(UTC\)/i)).not.toBeInTheDocument();
   });
@@ -152,16 +158,17 @@ describe("App visibility UI", () => {
   it("toggles sun position time label with the global Local/UTC pill", async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
+    await seedSeattleCoordinates(user);
     await user.click(computeButton(container));
 
     const sunBlock = screen.getByRole("heading", { name: /^sun position$/i }).closest(".result-item");
     expect(sunBlock).toBeTruthy();
     expect(within(sunBlock!).getByText(/^Local time:/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^UTC$/ }));
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^UTC$/ }));
     expect(within(sunBlock!).getByText(/^UTC:/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Local$/ }));
+    await user.click(resultTimeDisplayGroup().getByRole("button", { name: /^Local$/ }));
     expect(within(sunBlock!).getByText(/^Local time:/i)).toBeInTheDocument();
   });
 });
