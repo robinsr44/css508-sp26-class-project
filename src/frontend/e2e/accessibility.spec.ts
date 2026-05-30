@@ -6,6 +6,25 @@ import { expect, test } from "@playwright/test";
  * often conflict with intentional dark-theme layouts in course demos.
  */
 test.describe("accessibility", () => {
+  test("axe reports no violations on initial page (excluding color-contrast)", async ({ page }) => {
+    await page.goto("/");
+
+    const results = await new AxeBuilder({ page }).disableRules(["color-contrast"]).analyze();
+
+    expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+  });
+
+  test("skip link moves focus to main content", async ({ page }) => {
+    await page.goto("/");
+
+    await page.keyboard.press("Tab");
+    const skipLink = page.getByRole("link", { name: /skip to main content/i });
+    await expect(skipLink).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
+  });
+
   test("axe reports no violations (excluding color-contrast) after compute", async ({ page }) => {
     await page.goto("/");
 

@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { resetNominatimClientForTests } from "./nominatim";
 
 function versionResponse() {
   return new Response(JSON.stringify({ service: "moon-api", version: "1.1.0" }), {
@@ -16,6 +17,7 @@ function versionResponse() {
 
 describe("location search (Nominatim)", () => {
   beforeEach(() => {
+    resetNominatimClientForTests();
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -34,6 +36,7 @@ describe("location search (Nominatim)", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetNominatimClientForTests();
   });
 
   it("shows no-results copy when Nominatim returns an empty array", async () => {

@@ -23,6 +23,13 @@ function parseHhMm(hm: string): { hh: number; mm: number } | null {
   return { hh, mm };
 }
 
+/** True when `hm` is a valid 24-hour wall-clock time (HH:MM, 00:00–23:59). */
+export function isValidTimeHhMm(hm: string): boolean {
+  const parts = parseHhMm(hm);
+  if (!parts) return false;
+  return parts.hh >= 0 && parts.hh <= 23 && parts.mm >= 0 && parts.mm <= 59;
+}
+
 function getTimeZoneOffsetMs(timeZone: string, utcInstant: Date): number {
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -105,17 +112,18 @@ export function getPrimaryTimeZone(lat: number, lon: number): string | null {
   }
 }
 
-/** Format a UTC ISO-8601 instant in the given IANA timezone for display. */
+/** Format a UTC ISO-8601 instant in the given IANA timezone for display (24-hour clock). */
 export function formatUtcIsoInZone(isoUtc: string, timeZone: string): string {
   const d = new Date(isoUtc);
   if (Number.isNaN(d.getTime())) return isoUtc;
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat("en-US", {
       timeZone,
+      hourCycle: "h23",
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "numeric",
+      hour: "2-digit",
       minute: "2-digit",
       timeZoneName: "short",
     }).format(d);

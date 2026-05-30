@@ -1,6 +1,7 @@
 /**
- * Mirrors `moon_ephemeris.cpp` (suncalc-derived) so frontend tests can assert against the same
- * low-precision ephemeris as `moon-api` without starting the HTTP server.
+ * Mirrors `moon_ephemeris.cpp` (SunCalc-derived; see THIRD_PARTY_NOTICES.md) so frontend tests
+ * can assert against the same low-precision ephemeris as the C++ backend without starting
+ * the HTTP server.
  */
 
 import type { MoonApiResponse, SunApiResponse } from "../api";

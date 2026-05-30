@@ -1,8 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fetchMoon, fetchSun, type MoonApiResponse, type SunApiResponse } from "./api";
 import { formatInstantForDisplay, getPrimaryTimeZone, localWallClockToUtc, utcWallClockToLocal } from "./locationTime";
+import { searchNominatim } from "./nominatim";
 import MoonPhase from "./MoonPhase";
+import TimeInput24 from "./TimeInput24";
 import { phaseDisplayName } from "./phaseDisplayName";
 import { hoursAboveHorizonText } from "./visibilityText";
 
@@ -41,6 +43,29 @@ export default function App() {
   const [locationSearchError, setLocationSearchError] = useState<string | null>(null);
   const [resolvedLocationName, setResolvedLocationName] = useState<string | null>(null);
   const locationSearchAbort = useRef<AbortController | null>(null);
+  const prevLoadingRef = useRef(false);
+  const [liveMessage, setLiveMessage] = useState("");
+
+  useEffect(() => {
+    if (loading) {
+      setLiveMessage("Computing moon and sun data.");
+    } else if (prevLoadingRef.current && data && sunData) {
+      setLiveMessage("Moon and sun results are ready.");
+    }
+    prevLoadingRef.current = loading;
+  }, [loading, data, sunData]);
+
+  useEffect(() => {
+    if (locationSearching) {
+      setLiveMessage("Searching for location.");
+    }
+  }, [locationSearching]);
+
+  useEffect(() => {
+    if (locating) {
+      setLiveMessage("Determining your device location.");
+    }
+  }, [locating]);
 
   const hasLocationSet = useMemo(() => {
     if (locationQuery.trim()) return true;
@@ -136,24 +161,6 @@ export default function App() {
     );
   }
 
-  async function resolveLocationQuery(
-    q: string,
-    signal?: AbortSignal,
-  ): Promise<{ lat: number; lon: number; displayName: string } | null> {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-      { headers: { Accept: "application/json" }, signal },
-    );
-    if (!res.ok) throw new Error("Search request failed.");
-    const results = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
-    if (results.length === 0) return null;
-    return {
-      lat: parseFloat(results[0].lat),
-      lon: parseFloat(results[0].lon),
-      displayName: results[0].display_name,
-    };
-  }
-
   function useMyLocation() {
     if (!navigator.geolocation) {
       setGeoError("Geolocation is not supported by your browser.");
@@ -191,7 +198,7 @@ export default function App() {
     setResolvedLocationName(null);
     setGeoError(null);
     try {
-      const resolved = await resolveLocationQuery(q, controller.signal);
+      const resolved = await searchNominatim(q, controller.signal);
       if (!resolved) {
         setLocationSearchError(`No results found for "${q}". Try a more specific search.`);
         return;
@@ -230,7 +237,7 @@ export default function App() {
       const q = locationQuery.trim();
       if (q) {
         setLocationSearchError(null);
-        const resolved = await resolveLocationQuery(q);
+        const resolved = await searchNominatim(q);
         if (!resolved) {
           throw new Error(`No results found for "${q}". Try a more specific search.`);
         }
@@ -266,14 +273,25 @@ export default function App() {
 
   return (
     <div className="app">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <div className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {liveMessage}
+      </div>
       <header className="app-header">
         <h1>Moon tracker</h1>
         <p className="subtitle">
           Enter a location and date to see moon phase, moonrise/moonset times, and sun position.
         </p>
-        <details className="disclaimer">
-          <summary>Disclaimer — recreational use only</summary>
-          <div className="disclaimer-body">
+        <p id="navigation-disclaimer" className="navigation-disclaimer" role="note">
+          <strong>Not for navigation.</strong> Moon and sun data are approximate estimates for
+          recreational interest only—not for aviation, maritime, driving, hiking, or other
+          safety-critical use.
+        </p>
+        <details className="disclaimer" aria-labelledby="disclaimer-summary">
+          <summary id="disclaimer-summary">Full disclaimer</summary>
+          <div className="disclaimer-body" aria-labelledby="disclaimer-summary">
             <p>
               <strong>Information for recreational purposes only.</strong> Moon phase, rise/set times,
               and sun position shown here are estimates intended for general interest and casual
@@ -308,8 +326,13 @@ export default function App() {
         </details>
       </header>
 
-      <main className="app-main">
-      <form className="card" onSubmit={onSubmit}>
+      <main id="main-content" className="app-main" tabIndex={-1}>
+      <form
+        className="card"
+        onSubmit={onSubmit}
+        aria-busy={loading}
+        aria-describedby={locationRequiredHint ? "location-required-hint" : undefined}
+      >
         <div>
           <label htmlFor="location-search">Location</label>
           <div className="location-search-row">
@@ -317,6 +340,16 @@ export default function App() {
               id="location-search"
               type="search"
               placeholder="City, e.g. Richmond, VA or Tokyo"
+              aria-describedby={
+                [
+                  "location-search-hint",
+                  "location-search-attribution",
+                  resolvedLocationName ? "location-resolved-hint" : null,
+                  locationSearchError ? "location-search-error" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
               value={locationQuery}
               onChange={(e) => {
                 setLocationQuery(e.target.value);
@@ -338,11 +371,33 @@ export default function App() {
               {locationSearching ? "Searching…" : "Search"}
             </button>
           </div>
+          <p id="location-search-hint" className="input-hint">
+            Search by city or place name, or enter coordinates below.
+          </p>
+          <p id="location-search-attribution" className="input-hint location-attribution">
+            Location search ©{" "}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              OpenStreetMap
+            </a>{" "}
+            contributors, via{" "}
+            <a href="https://nominatim.org/" target="_blank" rel="noopener noreferrer">
+              Nominatim
+            </a>
+            .
+          </p>
           {resolvedLocationName ? (
-            <p className="input-hint location-resolved">{resolvedLocationName}</p>
+            <p id="location-resolved-hint" className="input-hint location-resolved" role="status">
+              {resolvedLocationName}
+            </p>
           ) : null}
           {locationSearchError ? (
-            <p className="error location-error">{locationSearchError}</p>
+            <p id="location-search-error" className="error location-error" role="alert">
+              {locationSearchError}
+            </p>
           ) : null}
         </div>
 
@@ -351,14 +406,14 @@ export default function App() {
             {locating ? "Locating…" : "Use my location"}
           </button>
           {geoError ? (
-            <p className="error" style={{ marginTop: "0.4rem", marginBottom: 0 }}>
+            <p className="error" role="alert" style={{ marginTop: "0.4rem", marginBottom: 0 }}>
               {geoError}
             </p>
           ) : null}
         </div>
 
-        <div className="coords-divider">
-          <span>or enter coordinates</span>
+        <div className="coords-divider" role="separator" aria-label="or enter coordinates">
+          <span aria-hidden="true">or enter coordinates</span>
         </div>
 
         <div className="row">
@@ -400,17 +455,22 @@ export default function App() {
                 {timeZonePill("Time entry")}
               </div>
             </div>
-            <input id="time" type="time" value={displayTime} onChange={(e) => onTimeChange(e.target.value)} />
-            <p className="input-hint">
+            <TimeInput24
+              id="time"
+              value={displayTime}
+              aria-describedby="time-format-hint"
+              onChange={onTimeChange}
+            />
+            <p id="time-format-hint" className="input-hint">
               {useUtcInput ? "24-hour clock, UTC" : "24-hour clock, destination local time"}
             </p>
           </div>
         </div>
-        <button type="submit" disabled={!canSubmit || loading}>
+        <button type="submit" disabled={!canSubmit || loading} aria-disabled={!canSubmit || loading}>
           {loading ? "Computing…" : "Compute"}
         </button>
         {locationRequiredHint ? (
-          <p className="muted location-required-hint" role="status">
+          <p id="location-required-hint" className="muted location-required-hint" role="status">
             Set a location using search, your device location, or coordinates before computing.
           </p>
         ) : null}
@@ -429,7 +489,10 @@ export default function App() {
       ) : null}
 
       {data ? (
-        <div className="card result-grid">
+        <section className="card result-grid" aria-labelledby="moon-results-heading">
+          <h2 id="moon-results-heading" className="visually-hidden">
+            Moon results
+          </h2>
           <div className="result-location">
             {resultLocationName ? <p className="result-location-name">{resultLocationName}</p> : null}
             <p className="result-location-coords muted">
@@ -510,11 +573,14 @@ export default function App() {
               <p>The moon is below the horizon all day.</p>
             )}
           </div>
-        </div>
+        </section>
       ) : null}
 
       {sunData ? (
-        <div className="card result-grid">
+        <section className="card result-grid" aria-labelledby="sun-results-heading">
+          <h2 id="sun-results-heading" className="visually-hidden">
+            Sun results
+          </h2>
           <div className="result-item">
             <h2>Sun position</h2>
             <p className="muted" style={{ marginTop: 0 }}>
@@ -541,8 +607,61 @@ export default function App() {
               </strong>
             </p>
           </div>
-        </div>
+        </section>
       ) : null}
+
+      <footer className="app-footer">
+        <h2>Accessibility</h2>
+        <p>
+          This application is designed to conform with{" "}
+          <a
+            href="https://www.w3.org/WAI/standards-guidelines/wcag/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WCAG 2.1 Level AA
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://www.section508.gov/manage/laws-and-policies/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Section 508
+          </a>{" "}
+          digital accessibility requirements. It supports keyboard navigation, visible focus
+          indicators, screen-reader announcements for status updates, and reduced-motion preferences.
+        </p>
+        <p>
+          If you encounter an accessibility barrier, please contact the course team or open an issue
+          in the project repository with a description of the problem and the assistive technology
+          you are using.
+        </p>
+        <h2>Attribution</h2>
+        <p>
+          Place-name search uses{" "}
+          <a href="https://nominatim.org/" target="_blank" rel="noopener noreferrer">
+            Nominatim
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            OpenStreetMap
+          </a>{" "}
+          data (© OpenStreetMap contributors, ODbL).
+        </p>
+        <p>
+          Moon and sun calculations are adapted from{" "}
+          <a href="https://github.com/mourner/suncalc" target="_blank" rel="noopener noreferrer">
+            SunCalc
+          </a>{" "}
+          (BSD-2-Clause, © 2011–2015 Vladimir Agafonkin). Results are approximate and for
+          recreational use only — not for navigation or safety-critical decisions.
+        </p>
+      </footer>
       </main>
     </div>
   );

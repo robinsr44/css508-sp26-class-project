@@ -80,7 +80,15 @@ describe("formatUtcIsoInZone", () => {
   it("formats a valid UTC instant in UTC timezone", () => {
     const out = formatUtcIsoInZone("2024-06-15T12:00:00.000Z", "UTC");
     expect(out).toMatch(/2024/);
+    expect(out).toMatch(/12:00/);
+    expect(out).not.toMatch(/\b(AM|PM)\b/i);
     expect(out.length).toBeGreaterThan(10);
+  });
+
+  it("formats early-morning instants with a 24-hour clock", () => {
+    const out = formatUtcIsoInZone("2024-06-15T03:27:00.000Z", "UTC");
+    expect(out).toMatch(/03:27/);
+    expect(out).not.toMatch(/\b(AM|PM)\b/i);
   });
 
   it("returns the original string when Intl.DateTimeFormat throws", () => {

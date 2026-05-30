@@ -107,7 +107,7 @@ From a **browser** on the same origin as the app (Vite or nginx), relative URLs 
 
 ## Computation layer
 
-The **computation layer** is the C++ translation unit **`moon_ephemeris`** ([`src/backend/src/moon_ephemeris.h`](src/backend/src/moon_ephemeris.h), [`src/backend/src/moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)). It lives in the **`moon` namespace**, has **no network or disk I/O**, and implements **low-precision, UI-grade** astronomy adapted from the **suncalc** family of algorithms (see source file attribution). The HTTP server (**`main.cpp`**) is the **only** caller in this project: it maps validated request parameters to these functions and serializes results as JSON.
+The **computation layer** is the C++ translation unit **`moon_ephemeris`** ([`src/backend/src/moon_ephemeris.h`](src/backend/src/moon_ephemeris.h), [`src/backend/src/moon_ephemeris.cpp`](src/backend/src/moon_ephemeris.cpp)). It lives in the **`moon` namespace**, has **no network or disk I/O**, and implements **low-precision, UI-grade** astronomy adapted from **[SunCalc](https://github.com/mourner/suncalc)** (BSD-2-Clause; full notice in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)). The HTTP server (**`main.cpp`**) is the **only** caller in this project: it maps validated request parameters to these functions and serializes results as JSON.
 
 ### Computation structure (diagram)
 
