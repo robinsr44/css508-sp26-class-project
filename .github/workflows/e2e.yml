@@ -50,9 +50,9 @@ jobs:
           echo "::error::moon-api did not become healthy on port 8080"
           exit 1
 
-      - name: Run Playwright E2E
+      - name: Run Playwright E2E (functional)
         working-directory: src/frontend
-        run: npm run test:e2e
+        run: npm run test:e2e:ci
 
       - name: Stop moon-api
         if: always()

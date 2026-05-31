@@ -33,7 +33,7 @@ The test strategy will follow a layered testing strategy with the following leve
 | Strategy | Description |
 |----------|-------------|
 | **Local** | Day to day: **CMake** for the backend, **npm** for the frontend. Full Docker builds are optional; see **README**. |
-| **CI** | **GitHub Actions**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — frontend **Vitest**/lint, backend **cmake**/**ctest** + moon-api TCP smoke, Docker compose smoke. [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) — build **`moon-api`**, **Playwright** **`npm run test:e2e`** on pull requests. |
+| **CI** | **GitHub Actions**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — frontend **Vitest**/lint, functional Playwright **`npm run test:e2e:ci`**, backend **cmake**/**ctest** + moon-api TCP smoke, Docker compose smoke. [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) — functional Playwright on pull requests. [`.github/workflows/specialized-testing.yml`](.github/workflows/specialized-testing.yml) — performance budgets + automated a11y (**`npm run test:specialized:a11y`**, **`test:specialized:e2e`**). |
 | **E2E** | Automated full-stack browser checks (live **`/api/moon`** & **`/api/sun`** through the dev proxy, illum time-toggle UI, stubbed **Nominatim** route, post-compute **axe** scan). Mapped to **E2E-01**–**E2E-03** in [TestPlan.md](TestPlan.md). |
 | **Beta (stretch)** | Real people try the app and give feedback on design and usability. |
 
@@ -127,7 +127,7 @@ E2E complements **Vitest** (fast, deterministic mocks) by exercising **real Chro
 | Topic | Approach |
 |-------|----------|
 | **Stack** | **`moon-api` on 8080**; Playwright starts **Vite** (embedded webServer) so **`/api`** is proxied like developer workflow. |
-| **Specs** | [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts), [`failure.spec.ts`](src/frontend/e2e/failure.spec.ts), [`location-search-failure.spec.ts`](src/frontend/e2e/location-search-failure.spec.ts), [`keyboard.spec.ts`](src/frontend/e2e/keyboard.spec.ts), [`accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts) (axe; **color-contrast** off). **Docker:** [`docker-playwright.sh`](scripts/ci/docker-playwright.sh) in CI **container** job. |
+| **Specs** | **Functional E2E (main CI):** [`smoke.spec.ts`](src/frontend/e2e/smoke.spec.ts), [`failure.spec.ts`](src/frontend/e2e/failure.spec.ts), [`location-search-failure.spec.ts`](src/frontend/e2e/location-search-failure.spec.ts) via **`npm run test:e2e:ci`**. **Specialized Testing workflow:** [`accessibility.spec.ts`](src/frontend/e2e/accessibility.spec.ts), [`keyboard.spec.ts`](src/frontend/e2e/keyboard.spec.ts) via **`npm run test:specialized:a11y`**; [`e2e/specialized/performance.spec.ts`](src/frontend/e2e/specialized/performance.spec.ts) via **`test:specialized:e2e`**. **Docker:** [`docker-playwright.sh`](scripts/ci/docker-playwright.sh) in CI **container** job. |
 | **CI** | Workflow **[`e2e.yml`](.github/workflows/e2e.yml)** on **`pull_request`** (opened, synchronize, reopened). |
 | **Detail / commands** | [E2ETestPlan.md](E2ETestPlan.md) |
 

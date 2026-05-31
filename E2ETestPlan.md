@@ -158,6 +158,8 @@ Pull-request workflows:
 
 | Job | Role |
 |-----|------|
-| **playwright** | CMake **build** `moon-api` only (no **ctest** here; backend job covers tests), runs it on **8080**, **`npm ci`** + **`npx playwright install chromium --with-deps`**, **`npm run test:e2e`** (Playwright starts Vite on **5173**). On failure, uploads **`playwright-report`** artifact for debugging. |
+| **playwright** | CMake **build** `moon-api` only (no **ctest** here; backend job covers tests), runs it on **8080**, **`npm ci`** + **`npx playwright install chromium --with-deps`**, **`npm run test:e2e:ci`** (functional specs; Playwright starts Vite on **5173**). On failure, uploads **`playwright-report`** artifact for debugging. |
+
+**[`specialized-testing.yml`](.github/workflows/specialized-testing.yml)** — performance budgets + automated a11y (**`npm run test:specialized:e2e`**, **`npm run test:specialized:a11y`**) on pull requests.
 
 Vitest does **not** require `moon-api`. Playwright uses a locally built **`moon-api`** in this workflow (live `/api` traffic).

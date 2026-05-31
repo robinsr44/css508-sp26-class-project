@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  performance:
-    name: Performance (API, bundle, browser)
+  specialized:
+    name: Performance and accessibility
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +66,12 @@ jobs:
         env:
           CI: true
         run: npm run test:specialized:e2e
+
+      - name: Browser accessibility (axe, skip link, keyboard)
+        working-directory: src/frontend
+        env:
+          CI: true
+        run: npm run test:specialized:a11y
 
       - name: Stop moon-api
         if: always()
