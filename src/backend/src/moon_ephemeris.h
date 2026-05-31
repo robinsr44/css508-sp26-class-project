@@ -35,6 +35,8 @@ MoonIllumination compute_illumination(double jd);
 
 MoonHorizon moon_position(double jd, double lat_deg, double lon_deg);
 
+MoonTimes moon_times_in_interval(double jd_start, double jd_end, double lat_deg, double lon_deg);
+
 MoonTimes moon_times_for_utc_day(int year, int month, int day, double lat_deg, double lon_deg);
 
 double julian_date_from_unix_seconds(double unix_sec);
@@ -42,11 +44,18 @@ double unix_seconds_from_julian_date(double jd);
 
 bool parse_date(const std::string& ymd, int& y, int& m, int& d);
 bool parse_time_hh_mm(const std::string& hm, int& hh, int& mm);
+/** Parses `YYYY-MM-DDTHH:MM:SSZ` (no fractional seconds). */
+bool parse_iso8601_utc(const std::string& iso, double& jd_out);
 
 std::string iso8601_utc_from_jd(double jd);
 
+struct VisibilityWindow {
+  double jd_start{};
+  double jd_end{};
+};
+
 MoonResult compute_full(int year, int month, int day, int hour_utc, int minute_utc, double lat_deg,
-                        double lon_deg);
+                        double lon_deg, const std::optional<VisibilityWindow>& visibility = std::nullopt);
 
 struct SunHorizon {
   double azimuth_deg{};

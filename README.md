@@ -333,6 +333,8 @@ curl -s http://127.0.0.1:8080/api/version
 | `lon` | Yes | Longitude in decimal degrees, **[-180, 180]** |
 | `date` | Yes | Calendar date **`YYYY-MM-DD`** |
 | `time` | No | Time **`HH:MM`** in **UTC** (default **`12:00`**) |
+| `vis_start_utc` | No | Start of visibility search window, ISO **`YYYY-MM-DDTHH:MM:SSZ`** (must pair with `vis_end_utc`) |
+| `vis_end_utc` | No | End of visibility search window (exclusive), same format; span ≤ 26 hours |
 
 **Example**
 
@@ -350,6 +352,8 @@ curl -s "http://127.0.0.1:8080/api/moon?lat=47.6062&lon=-122.3321&date=2026-04-0
 | `lon` | Yes | number |
 | `date` | Yes | string `YYYY-MM-DD` |
 | `time` | No | string `HH:MM` UTC (default **12:00**) |
+| `vis_start_utc` | No | string ISO **`YYYY-MM-DDTHH:MM:SSZ`** — visibility window start (pair with `vis_end_utc`) |
+| `vis_end_utc` | No | string ISO UTC — visibility window end (exclusive); span ≤ 26 hours |
 
 **Example**
 
@@ -427,7 +431,7 @@ curl -s -X POST http://127.0.0.1:8080/api/sun \
 ## Time and semantics (important)
 
 - **`instant_utc`**, **`time`** query/body field, and phase/illumination use the **UTC** clock.
-- **Moonrise / moonset** are computed for the **UTC calendar day** of `date` (midnight UTC to midnight UTC). They do not follow your local civil timezone unless you convert externally.
+- **Moonrise / moonset** are computed for a **visibility window** on the requested calendar day. When the UI can resolve an IANA timezone for the coordinates, it sends `vis_start_utc` and `vis_end_utc` for that location’s **local civil day** (local midnight to next local midnight, including DST). Otherwise the window is the **UTC calendar day** of `date` (midnight UTC to midnight UTC). Phase and illumination still use the selected UTC **instant** (`date` + `time`).
 - **Illumination** at an instant does not depend on location; **rise/set** do.
 - **Visibility** means geometric horizon crossing under a clear-sky model, not weather.
 
@@ -442,7 +446,7 @@ curl -s -X POST http://127.0.0.1:8080/api/sun \
 | Docker build fails on network | Ensure Docker can reach the internet (base images, `npm install`, CMake `FetchContent`). |
 | Browser can’t reach API in dev | Start **`moon-api` first**; confirm Vite proxy target matches your API port. |
 | Playwright **global-setup** fails on `/api/health` | **`moon-api`** must be up on **`MOON_API_HEALTH_URL`** (default **http://127.0.0.1:8080/api/health**) before `npm run test:e2e`. See [E2E tests (Playwright)](#e2e-tests-playwright). |
-| Empty or wrong rise/set | Extreme latitudes may yield `always_up` / `always_down`; UTC-day semantics may differ from local almanacs. |
+| Empty or wrong rise/set | Extreme latitudes may yield `always_up` / `always_down`; times are approximate (SunCalc-grade), not weather-adjusted. |
 
 ---
 

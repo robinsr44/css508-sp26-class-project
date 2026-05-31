@@ -55,7 +55,12 @@ function moonSunFetchHandler() {
       if (!dateStr) return new Response(JSON.stringify({ error: "missing date" }), { status: 400 });
 
       const [y, mo, d] = dateStr.split("-").map(Number);
-      const golden = buildMoonSunGoldenResponses(y, mo, d, th, tm, latQ, lonQ);
+      const visStart = u.searchParams.get("vis_start_utc");
+      const visEnd = u.searchParams.get("vis_end_utc");
+      const golden = buildMoonSunGoldenResponses(y, mo, d, th, tm, latQ, lonQ, {
+        visibilityWindow:
+          visStart && visEnd ? { visStartUtc: visStart, visEndUtc: visEnd } : undefined,
+      });
       const body = raw.includes("/api/moon") ? golden.moon : golden.sun;
       return new Response(JSON.stringify(body), {
         status: 200,

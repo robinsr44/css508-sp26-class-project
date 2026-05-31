@@ -199,6 +199,19 @@ TEST(MoonTimes, MidLatitudeSummerDay) {
   EXPECT_NE(*t.rise_jd, *t.set_jd);
 }
 
+// Local civil day window (PDT) can differ from UTC calendar day rise/set for the same nominal date.
+TEST(MoonTimes, LocalCivilDayDiffersFromUtcDay) {
+  double jd_start = 0;
+  double jd_end = 0;
+  ASSERT_TRUE(moon::parse_iso8601_utc("2024-06-15T07:00:00Z", jd_start));
+  ASSERT_TRUE(moon::parse_iso8601_utc("2024-06-16T07:00:00Z", jd_end));
+  const moon::MoonTimes utc_day = moon::moon_times_for_utc_day(2024, 6, 15, 47.6, -122.33);
+  const moon::MoonTimes local_day = moon::moon_times_in_interval(jd_start, jd_end, 47.6, -122.33);
+  ASSERT_TRUE(utc_day.rise_jd.has_value());
+  ASSERT_TRUE(local_day.rise_jd.has_value());
+  EXPECT_NE(*utc_day.rise_jd, *local_day.rise_jd);
+}
+
 // Leap day 2024-02-29 computes without error at the same latitude/longitude.
 TEST(MoonTimes, LeapDay) {
   const moon::MoonTimes t = moon::moon_times_for_utc_day(2024, 2, 29, 47.6, -122.33);

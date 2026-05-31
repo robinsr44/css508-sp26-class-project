@@ -27,7 +27,7 @@ describe("ephemerisMirror — buildMoonSunGoldenResponses", () => {
     if (moon.visibility.state !== "normal") return;
     expect(moon.visibility.moonrise_utc).toBeDefined();
     expect(moon.visibility.moonset_utc).toBeDefined();
-    expect(moon.visibility.hours_above_horizon).toBeCloseTo(12.876987632364035, 5);
+    expect(moon.visibility.hours_above_horizon).toBeCloseTo(12.87766234204173, 5);
     expect(moon.illumination.fraction).toBeCloseTo(0.6236824221829433, kEpsFrac);
   });
 

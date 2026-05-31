@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { fetchMoon, fetchSun, type MoonApiResponse, type SunApiResponse } from "./api";
-import { formatInstantForDisplay, getPrimaryTimeZone, localWallClockToUtc, utcWallClockToLocal } from "./locationTime";
+import {
+  formatInstantForDisplay,
+  getPrimaryTimeZone,
+  localCivilDayUtcBounds,
+  localWallClockToUtc,
+  utcCalendarDayBounds,
+  utcWallClockToLocal,
+} from "./locationTime";
 import { searchNominatim } from "./nominatim";
 import MoonPhase from "./MoonPhase";
 import TimeInput24 from "./TimeInput24";
@@ -257,8 +264,20 @@ export default function App() {
         locationName = `${latN.toFixed(4)}°, ${lonN.toFixed(4)}°`;
       }
 
+      const tz = getPrimaryTimeZone(latN, lonN);
+      const useUtcForVisibility = showGmt || !tz;
+      const visibilityWindow = useUtcForVisibility
+        ? utcCalendarDayBounds(date)
+        : localCivilDayUtcBounds(displayDate, tz);
+
       const [moonRes, sunRes] = await Promise.all([
-        fetchMoon({ lat: latN, lon: lonN, date, timeUtc }),
+        fetchMoon({
+          lat: latN,
+          lon: lonN,
+          date,
+          timeUtc,
+          visibilityWindow: visibilityWindow ?? undefined,
+        }),
         fetchSun({ lat: latN, lon: lonN, date, timeUtc }),
       ]);
       setData(moonRes);
@@ -538,9 +557,18 @@ export default function App() {
           </div>
           <div className="result-item">
             <h2>Visibility</h2>
+            {resultTimeZone && !showGmt ? (
+              <p className="muted" style={{ marginTop: 0 }}>
+                Moonrise and moonset are for the selected local calendar day at this location.
+              </p>
+            ) : null}
             {!resultTimeZone ? (
               <p className="muted" style={{ marginTop: 0 }}>
-                No timezone found for these coordinates; showing UTC only.
+                No timezone found for these coordinates; rise and set use the UTC calendar day.
+              </p>
+            ) : showGmt ? (
+              <p className="muted" style={{ marginTop: 0 }}>
+                Moonrise and moonset are for the selected UTC calendar day.
               </p>
             ) : null}
             {data.visibility.state === "normal" ? (
