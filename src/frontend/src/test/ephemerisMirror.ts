@@ -287,26 +287,6 @@ function resolveVisibilityWindow(
   return { jdStart, jdEnd };
 }
 
-function computeFull(
-  year: number,
-  month: number,
-  day: number,
-  hourUtc: number,
-  minuteUtc: number,
-  latDeg: number,
-  lonDeg: number,
-  preferLocalCivil = true,
-) {
-  const jd = jdFromUtcYmdHms(year, month, day, hourUtc, minuteUtc, 0);
-  const illumination = computeIllumination(jd);
-  const phase_name = phaseNameFromPhase01(illumination.phase);
-  const window = resolveVisibilityWindow(year, month, day, hourUtc, minuteUtc, latDeg, lonDeg, preferLocalCivil);
-  const times = window
-    ? moonTimesInInterval(window.jdStart, window.jdEnd, latDeg, lonDeg)
-    : moonTimesForUtcDay(year, month, day, latDeg, lonDeg);
-  return { jd, illumination, phase_name, times };
-}
-
 /** Builds responses matching `moon_api.cpp` `build_json` / `build_sun_json`. */
 function moonTimesForRequest(
   y: number,
