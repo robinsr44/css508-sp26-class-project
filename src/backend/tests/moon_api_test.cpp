@@ -187,6 +187,35 @@ TEST(MoonApiGetMoon, Valid200Shape) {
   EXPECT_TRUE(j["visibility"].contains("state"));
 }
 
+// Optional vis_start_utc / vis_end_utc use a custom civil-day window (local PDT for Seattle).
+TEST(MoonApiGetMoon, VisibilityWindowChangesRiseSet) {
+  auto cli = NewClient();
+  const auto utc_day =
+      cli.Get("/api/moon?lat=47.6&lon=-122.33&date=2024-06-15&time=12:00");
+  const auto local_day = cli.Get(
+      "/api/moon?lat=47.6&lon=-122.33&date=2024-06-15&time=12:00"
+      "&vis_start_utc=2024-06-15T07:00:00Z&vis_end_utc=2024-06-16T07:00:00Z");
+  ASSERT_TRUE(utc_day);
+  ASSERT_TRUE(local_day);
+  ASSERT_EQ(utc_day->status, 200);
+  ASSERT_EQ(local_day->status, 200);
+  const auto j_utc = nlohmann::json::parse(utc_day->body);
+  const auto j_local = nlohmann::json::parse(local_day->body);
+  ASSERT_EQ(j_utc["visibility"]["state"], "normal");
+  ASSERT_EQ(j_local["visibility"]["state"], "normal");
+  EXPECT_NE(j_utc["visibility"]["moonrise_utc"], j_local["visibility"]["moonrise_utc"]);
+}
+
+// vis_start_utc without vis_end_utc returns 400.
+TEST(MoonApiGetMoon, VisibilityWindowRequiresBothParams) {
+  auto cli = NewClient();
+  const auto res = cli.Get(
+      "/api/moon?lat=47.6&lon=-122.33&date=2024-06-15&vis_start_utc=2024-06-15T07:00:00Z");
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->status, 400);
+  EXPECT_TRUE(JsonErrorHasMessage(res->body));
+}
+
 // Normal visibility: when both moonrise and moonset are present, hours_above_horizon is included.
 TEST(MoonApiGetMoon, NormalVisibilityHoursAboveHorizonWhenRiseAndSet) {
   auto cli = NewClient();

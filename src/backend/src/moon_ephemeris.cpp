@@ -154,19 +154,24 @@ MoonHorizon moon_position(double jd, double lat_deg, double lon_deg) {
 
 static double hours_later_jd(double jd, double hours) { return jd + hours / 24.0; }
 
-MoonTimes moon_times_for_utc_day(int year, int month, int day, double lat_deg, double lon_deg) {
-  const double jd0 = jd_from_utc_ymd_hms(year, month, day, 0, 0, 0);
+MoonTimes moon_times_in_interval(double jd_start, double jd_end, double lat_deg, double lon_deg) {
+  MoonTimes out;
+  if (jd_end <= jd_start) return out;
+
+  const double duration_h = (jd_end - jd_start) * 24.0;
+  const int max_i = static_cast<int>(std::ceil(duration_h));
 
   const double hc = 0.133 * RAD;
-  double h0 = moon_position(jd0, lat_deg, lon_deg).altitude - hc;
+  double h0 = moon_position(jd_start, lat_deg, lon_deg).altitude - hc;
   std::optional<double> rise_h;
   std::optional<double> set_h;
   double ye = 0;
 
-  for (int i = 1; i <= 24; i += 2) {
-    const double h1 = moon_position(hours_later_jd(jd0, static_cast<double>(i)), lat_deg, lon_deg).altitude - hc;
+  for (int i = 1; i <= max_i; i += 2) {
+    const double h1 =
+        moon_position(hours_later_jd(jd_start, static_cast<double>(i)), lat_deg, lon_deg).altitude - hc;
     const double h2 =
-        moon_position(hours_later_jd(jd0, static_cast<double>(i + 1)), lat_deg, lon_deg).altitude - hc;
+        moon_position(hours_later_jd(jd_start, static_cast<double>(i + 1)), lat_deg, lon_deg).altitude - hc;
     const double a = (h0 + h2) / 2.0 - h1;
     const double b = (h2 - h0) / 2.0;
     const double xe = (std::abs(a) < 1e-12) ? 0.0 : -b / (2.0 * a);
@@ -196,14 +201,26 @@ MoonTimes moon_times_for_utc_day(int year, int month, int day, double lat_deg, d
     h0 = h2;
   }
 
-  MoonTimes out;
-  if (rise_h) out.rise_jd = hours_later_jd(jd0, *rise_h);
-  if (set_h) out.set_jd = hours_later_jd(jd0, *set_h);
-  if (!rise_h && !set_h) {
+  auto in_window = [jd_start, jd_end](double jd) { return jd >= jd_start && jd < jd_end; };
+
+  if (rise_h) {
+    const double rise_jd = hours_later_jd(jd_start, *rise_h);
+    if (in_window(rise_jd)) out.rise_jd = rise_jd;
+  }
+  if (set_h) {
+    const double set_jd = hours_later_jd(jd_start, *set_h);
+    if (in_window(set_jd)) out.set_jd = set_jd;
+  }
+  if (!out.rise_jd && !out.set_jd) {
     if (ye > 0) out.always_up = true;
     else out.always_down = true;
   }
   return out;
+}
+
+MoonTimes moon_times_for_utc_day(int year, int month, int day, double lat_deg, double lon_deg) {
+  const double jd0 = jd_from_utc_ymd_hms(year, month, day, 0, 0, 0);
+  return moon_times_in_interval(jd0, jd0 + 1.0, lat_deg, lon_deg);
 }
 
 bool parse_date(const std::string& ymd, int& y, int& m, int& d) {
@@ -215,6 +232,15 @@ bool parse_time_hh_mm(const std::string& hm, int& hh, int& mm) {
   if (hm.empty()) return false;
   if (std::sscanf(hm.c_str(), "%d:%d", &hh, &mm) != 2) return false;
   return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
+}
+
+bool parse_iso8601_utc(const std::string& iso, double& jd_out) {
+  int y = 0, m = 0, d = 0, hh = 0, mm = 0, ss = 0;
+  if (std::sscanf(iso.c_str(), "%d-%d-%dT%d:%d:%dZ", &y, &m, &d, &hh, &mm, &ss) != 6) return false;
+  if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return false;
+  jd_out = jd_from_utc_ymd_hms(y, m, d, hh, mm, ss);
+  return true;
 }
 
 std::string iso8601_utc_from_jd(double jd) {
@@ -234,12 +260,16 @@ std::string iso8601_utc_from_jd(double jd) {
 }
 
 MoonResult compute_full(int year, int month, int day, int hour_utc, int minute_utc, double lat_deg,
-                        double lon_deg) {
+                        double lon_deg, const std::optional<VisibilityWindow>& visibility) {
   const double jd = jd_from_utc_ymd_hms(year, month, day, hour_utc, minute_utc, 0);
   MoonResult r;
   r.illumination = compute_illumination(jd);
   r.phase_name = phase_name_from_phase01(r.illumination.phase);
-  r.times = moon_times_for_utc_day(year, month, day, lat_deg, lon_deg);
+  if (visibility) {
+    r.times = moon_times_in_interval(visibility->jd_start, visibility->jd_end, lat_deg, lon_deg);
+  } else {
+    r.times = moon_times_for_utc_day(year, month, day, lat_deg, lon_deg);
+  }
   return r;
 }
 

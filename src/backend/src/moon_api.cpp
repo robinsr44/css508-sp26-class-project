@@ -51,17 +51,97 @@ nlohmann::json build_json(const moon::MoonResult& r, int y, int m, int d, int hh
   return j;
 }
 
-void handle_moon(double lat, double lon, int y, int m, int d, int hh, int mm, httplib::Response& res) {
+void handle_moon(double lat, double lon, int y, int m, int d, int hh, int mm,
+                const std::optional<moon::VisibilityWindow>& visibility, httplib::Response& res) {
   if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
     res.status = 400;
     res.set_content(R"({"error":"lat must be in [-90,90] and lon in [-180,180]"})", "application/json");
     set_cors(res);
     return;
   }
-  moon::MoonResult result = moon::compute_full(y, m, d, hh, mm, lat, lon);
+  moon::MoonResult result = moon::compute_full(y, m, d, hh, mm, lat, lon, visibility);
   nlohmann::json j = build_json(result, y, m, d, hh, mm, lat, lon);
   res.set_content(j.dump(), "application/json");
   set_cors(res);
+}
+
+bool parse_visibility_window(const std::string& start_iso, const std::string& end_iso,
+                             std::optional<moon::VisibilityWindow>& out, httplib::Response& res) {
+  double jd_start = 0;
+  double jd_end = 0;
+  if (!moon::parse_iso8601_utc(start_iso, jd_start) || !moon::parse_iso8601_utc(end_iso, jd_end)) {
+    res.status = 400;
+    res.set_content(
+        R"ERR({"error":"vis_start_utc and vis_end_utc must be ISO 8601 UTC (YYYY-MM-DDTHH:MM:SSZ)"})ERR",
+        "application/json");
+    set_cors(res);
+    return false;
+  }
+  if (jd_end <= jd_start) {
+    res.status = 400;
+    res.set_content(R"({"error":"vis_end_utc must be after vis_start_utc"})", "application/json");
+    set_cors(res);
+    return false;
+  }
+  const double span_hours = (jd_end - jd_start) * 24.0;
+  if (span_hours > 26.0) {
+    res.status = 400;
+    res.set_content(R"({"error":"visibility window must be at most 26 hours"})", "application/json");
+    set_cors(res);
+    return false;
+  }
+  out = moon::VisibilityWindow{jd_start, jd_end};
+  return true;
+}
+
+bool parse_get_visibility_params(const httplib::Request& req,
+                                 std::optional<moon::VisibilityWindow>& visibility,
+                                 httplib::Response& res) {
+  const auto start_it = req.params.find("vis_start_utc");
+  const auto end_it = req.params.find("vis_end_utc");
+  const bool has_start = start_it != req.params.end();
+  const bool has_end = end_it != req.params.end();
+  if (!has_start && !has_end) {
+    visibility.reset();
+    return true;
+  }
+  if (!has_start || !has_end) {
+    res.status = 400;
+    res.set_content(
+        R"({"error":"vis_start_utc and vis_end_utc must both be provided or both omitted"})",
+        "application/json");
+    set_cors(res);
+    return false;
+  }
+  return parse_visibility_window(start_it->second, end_it->second, visibility, res);
+}
+
+bool parse_post_visibility_params(const nlohmann::json& body,
+                                  std::optional<moon::VisibilityWindow>& visibility,
+                                  httplib::Response& res) {
+  const bool has_start = body.contains("vis_start_utc");
+  const bool has_end = body.contains("vis_end_utc");
+  if (!has_start && !has_end) {
+    visibility.reset();
+    return true;
+  }
+  if (!has_start || !has_end) {
+    res.status = 400;
+    res.set_content(
+        R"({"error":"vis_start_utc and vis_end_utc must both be provided or both omitted"})",
+        "application/json");
+    set_cors(res);
+    return false;
+  }
+  if (!body["vis_start_utc"].is_string() || !body["vis_end_utc"].is_string()) {
+    res.status = 400;
+    res.set_content(
+        R"({"error":"vis_start_utc and vis_end_utc must be JSON strings"})", "application/json");
+    set_cors(res);
+    return false;
+  }
+  return parse_visibility_window(body["vis_start_utc"].get<std::string>(),
+                                 body["vis_end_utc"].get<std::string>(), visibility, res);
 }
 
 nlohmann::json build_sun_json(const moon::SunResult& r, int y, int m, int d, int hh, int mm, double lat,
@@ -130,7 +210,8 @@ bool parse_get_moon_sun_params(const httplib::Request& req, httplib::Response& r
 
 // Parses shared JSON body for POST /api/moon and POST /api/sun. On failure, sets res and CORS; returns false.
 bool parse_post_moon_sun_body(const httplib::Request& req, httplib::Response& res, double& lat, double& lon,
-                              int& y, int& m, int& d, int& hh, int& mm) {
+                              int& y, int& m, int& d, int& hh, int& mm,
+                              nlohmann::json* body_out = nullptr) {
   nlohmann::json body;
   try {
     body = nlohmann::json::parse(req.body.empty() ? "{}" : req.body);
@@ -140,6 +221,7 @@ bool parse_post_moon_sun_body(const httplib::Request& req, httplib::Response& re
     set_cors(res);
     return false;
   }
+  if (body_out) *body_out = body;
   if (!body.contains("lat") || !body.contains("lon") || !body.contains("date")) {
     res.status = 400;
     res.set_content(R"({"error":"JSON must include lat, lon, date"})", "application/json");
@@ -210,8 +292,10 @@ void register_moon_api_routes(httplib::Server& svr) {
   svr.Get("/api/moon", [](const httplib::Request& req, httplib::Response& res) {
     double lat = 0, lon = 0;
     int y = 0, m = 0, d = 0, hh = 12, mm = 0;
+    std::optional<moon::VisibilityWindow> visibility;
     if (!parse_get_moon_sun_params(req, res, lat, lon, y, m, d, hh, mm)) return;
-    handle_moon(lat, lon, y, m, d, hh, mm, res);
+    if (!parse_get_visibility_params(req, visibility, res)) return;
+    handle_moon(lat, lon, y, m, d, hh, mm, visibility, res);
   });
 
   svr.Get("/api/sun", [](const httplib::Request& req, httplib::Response& res) {
@@ -224,8 +308,11 @@ void register_moon_api_routes(httplib::Server& svr) {
   svr.Post("/api/moon", [](const httplib::Request& req, httplib::Response& res) {
     double lat = 0, lon = 0;
     int y = 0, m = 0, d = 0, hh = 12, mm = 0;
-    if (!parse_post_moon_sun_body(req, res, lat, lon, y, m, d, hh, mm)) return;
-    handle_moon(lat, lon, y, m, d, hh, mm, res);
+    std::optional<moon::VisibilityWindow> visibility;
+    nlohmann::json body;
+    if (!parse_post_moon_sun_body(req, res, lat, lon, y, m, d, hh, mm, &body)) return;
+    if (!parse_post_visibility_params(body, visibility, res)) return;
+    handle_moon(lat, lon, y, m, d, hh, mm, visibility, res);
   });
 
   svr.Post("/api/sun", [](const httplib::Request& req, httplib::Response& res) {

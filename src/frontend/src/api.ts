@@ -60,11 +60,17 @@ async function handleApiError(res: Response, text: string): Promise<never> {
   throw new Error(msg);
 }
 
+export type VisibilityWindowUtc = {
+  visStartUtc: string;
+  visEndUtc: string;
+};
+
 export async function fetchMoon(params: {
   lat: number;
   lon: number;
   date: string;
   timeUtc: string;
+  visibilityWindow?: VisibilityWindowUtc;
 }): Promise<MoonApiResponse> {
   const q = new URLSearchParams({
     lat: String(params.lat),
@@ -72,6 +78,10 @@ export async function fetchMoon(params: {
     date: params.date,
     time: params.timeUtc,
   });
+  if (params.visibilityWindow) {
+    q.set("vis_start_utc", params.visibilityWindow.visStartUtc);
+    q.set("vis_end_utc", params.visibilityWindow.visEndUtc);
+  }
   let res: Response;
   try {
     res = await fetch(`/api/moon?${q.toString()}`);

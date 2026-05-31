@@ -1,0 +1,78 @@
+name: Specialized Testing
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  specialized:
+    name: Performance and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake git
+
+      - name: Build moon-api
+        run: |
+          cmake -S src/backend -B build-specialized
+          cmake --build build-specialized -j "$(nproc)" --target moon-api
+
+      - name: Cold start until health (specialized)
+        run: bash scripts/ci/specialized-cold-start.sh ./build-specialized/moon-api 18080
+
+      - name: Start moon-api for performance probes
+        run: |
+          ./build-specialized/moon-api 8080 &
+          echo $! > /tmp/moon-api-specialized.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080/api/health >/dev/null; then
+              echo "moon-api ready on 8080"
+              exit 0
+            fi
+            sleep 0.25
+          done
+          echo "::error::moon-api failed to respond on /api/health"
+          exit 1
+
+      - name: API performance (latency, parallel, concurrency)
+        run: bash scripts/ci/specialized-performance.sh http://127.0.0.1:8080
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Frontend production build and bundle budget
+        working-directory: src/frontend
+        run: |
+          npm ci
+          npm run build
+          bash ../../scripts/ci/specialized-bundle-budget.sh
+
+      - name: Install Playwright Chromium
+        working-directory: src/frontend
+        run: npx playwright install chromium --with-deps
+
+      - name: Browser performance (time to interactive, compute delay)
+        working-directory: src/frontend
+        env:
+          CI: true
+        run: npm run test:specialized:e2e
+
+      - name: Browser accessibility (axe, skip link, keyboard)
+        working-directory: src/frontend
+        env:
+          CI: true
+        run: npm run test:specialized:a11y
+
+      - name: Stop moon-api
+        if: always()
+        run: kill "$(cat /tmp/moon-api-specialized.pid)" 2>/dev/null || true

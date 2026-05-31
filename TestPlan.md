@@ -127,7 +127,7 @@ Priorities (below): **P0** = must pass for any merge/demo; **P1** = should pass 
 
 **Coverage target:** Real **Chromium** sessions against **Vite** with **`moon-api` on 8080** (same proxy layout as local dev). Automated specs live under [`src/frontend/e2e/`](src/frontend/e2e/). Full suite breakdown, Vitest vs Playwright scope, and local commands: [E2ETestPlan.md](E2ETestPlan.md).
 
-**CI:** Pull requests run **`npm run test:e2e`** in [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) (builds `moon-api`, starts it on **8080**, installs Chromium, then Playwright).
+**CI:** Pull requests run functional **`npm run test:e2e:ci`** in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) (builds `moon-api`, starts it on **8080**, installs Chromium). Automated accessibility Playwright specs run in [`.github/workflows/specialized-testing.yml`](.github/workflows/specialized-testing.yml) via **`npm run test:specialized:a11y`**.
 
 | Case ID | Priority | Spec / focus | Description | Expected result |
 |---------|----------|----------------|-------------|-----------------|

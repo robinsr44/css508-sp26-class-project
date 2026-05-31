@@ -102,6 +102,41 @@ export function utcWallClockToLocal(
   };
 }
 
+function addOneDayYmd(ymd: string): string | null {
+  const parts = parseYmd(ymd);
+  if (!parts) return null;
+  const next = new Date(Date.UTC(parts.y, parts.m - 1, parts.d + 1));
+  return `${next.getUTCFullYear()}-${pad2(next.getUTCMonth() + 1)}-${pad2(next.getUTCDate())}`;
+}
+
+/** UTC ISO bounds for a local civil calendar day [midnight, next midnight) in `timeZone`. */
+export function localCivilDayUtcBounds(
+  dateLocalYmd: string,
+  timeZone: string,
+): { visStartUtc: string; visEndUtc: string } | null {
+  const start = localWallClockToUtc(dateLocalYmd, "00:00", timeZone);
+  const nextDay = addOneDayYmd(dateLocalYmd);
+  if (!start || !nextDay) return null;
+  const end = localWallClockToUtc(nextDay, "00:00", timeZone);
+  if (!end) return null;
+  return {
+    visStartUtc: `${start.dateUtc}T${start.timeUtc}:00Z`,
+    visEndUtc: `${end.dateUtc}T${end.timeUtc}:00Z`,
+  };
+}
+
+/** UTC ISO bounds for a UTC calendar day [00:00Z, next midnight Z). */
+export function utcCalendarDayBounds(dateUtcYmd: string): { visStartUtc: string; visEndUtc: string } | null {
+  const parts = parseYmd(dateUtcYmd);
+  if (!parts) return null;
+  const nextDay = addOneDayYmd(dateUtcYmd);
+  if (!nextDay) return null;
+  return {
+    visStartUtc: `${dateUtcYmd}T00:00:00Z`,
+    visEndUtc: `${nextDay}T00:00:00Z`,
+  };
+}
+
 /** IANA timezone at (lat, lon) using embedded boundary data (tz-lookup). */
 export function getPrimaryTimeZone(lat: number, lon: number): string | null {
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;

@@ -123,15 +123,16 @@ flowchart TB
   mt --> mpos[moon_position]
 ```
 
-`compute_full` combines illumination and phase naming with **moonrise/moonset** for the **UTC calendar day** of `date`. `moon_times_for_utc_day` searches hour steps and uses **moon position** above the horizon. `compute_sun_full` returns only **sun azimuth and altitude** at the requested UTC instant.
+`compute_full` combines illumination and phase naming with **moonrise/moonset** over a visibility window. By default the window is the **UTC calendar day** of `date`; optional `vis_start_utc` / `vis_end_utc` (ISO UTC) define a custom interval (the UI sends the observer’s **local civil day** when an IANA zone is known). `moon_times_in_interval` searches hour steps and uses **moon position** above the horizon. `compute_sun_full` returns only **sun azimuth and altitude** at the requested UTC instant.
 
 ### Computation units (definitions)
 
 | Unit | Definition |
 |------|------------|
-| **`compute_full`** | Top-level **moon** pipeline: given UTC **date/time** and **lat/lon**, builds a **`MoonResult`**: illumination + derived **phase name**, plus **`MoonTimes`** (rise/set JDs or polar flags) for that UTC day. |
+| **`compute_full`** | Top-level **moon** pipeline: given UTC **date/time** and **lat/lon**, builds a **`MoonResult`**: illumination + derived **phase name**, plus **`MoonTimes`** (rise/set JDs or polar flags) for the visibility window. |
 | **`compute_illumination`** | From a **Julian date**, computes lunar **lit fraction**, **phase** \([0,1)\), orientation angle, and **Sun–Moon–Earth** angle (degrees) using the internal sun/moon direction model. |
-| **`moon_times_for_utc_day`** | For a **UTC calendar day** and observer lat/lon, estimates **moonrise** and **moonset** (or **`always_up` / `always_down`**) using sampled **moon altitude** and a small horizon correction (same family of root-finding as the reference implementation). |
+| **`moon_times_in_interval`** | For a JD interval and observer lat/lon, estimates **moonrise** and **moonset** (or **`always_up` / `always_down`**) within that window. |
+| **`moon_times_for_utc_day`** | Convenience wrapper: UTC calendar day `[00:00Z, next midnight Z)` via `moon_times_in_interval`. |
 | **`moon_position`** | **Moon** azimuth, **altitude** (with atmospheric refraction), and **distance** (km) at a Julian date for a given observer—used internally for rise/set search (not serialized as its own object in the current JSON API). |
 | **`compute_sun_full`** | Top-level **sun** pipeline: returns **`SunResult`** with **`sun_position`** only—**azimuth** and **altitude** in **degrees** at the requested UTC instant. |
 | **`sun_position`** | **Sun** azimuth and altitude at a Julian date for the observer (refraction included in altitude; output in degrees in **`SunHorizon`**). |
@@ -143,7 +144,7 @@ flowchart TB
 1. **Not callable over HTTP by itself** — Clients always call **`/api/...`**. The ephemeris has **no HTTP server** and **no public CLI** in this repo.
 2. **Invocation path** — `moon-api` parses and validates inputs, then calls **`moon::compute_full`** for moon routes and **`moon::compute_sun_full`** for sun routes. Rise/set times are formatted with **`iso8601_utc_from_jd`** inside the JSON builders in [`main.cpp`](src/backend/src/main.cpp).
 3. **Extending or testing** — Link against the same object file / library target as `moon-api` and call **`moon::`** functions from C++ tests or another binary; keep **determinism** (same inputs → same floats) in mind for regression checks.
-4. **Semantics** — Phase and illumination depend on the **UTC instant**; rise/set depend on **location** and the **UTC day** boundary (see **Time and semantics** in [`README.md`](README.md)).
+4. **Semantics** — Phase and illumination depend on the **UTC instant**; rise/set depend on **location** and the visibility window (local civil day from the UI when possible; see **Time and semantics** in [`README.md`](README.md)).
 
 ## System components and connections
 

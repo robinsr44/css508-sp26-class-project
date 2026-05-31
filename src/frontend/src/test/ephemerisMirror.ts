@@ -4,7 +4,13 @@
  * the HTTP server.
  */
 
-import type { MoonApiResponse, SunApiResponse } from "../api";
+import type { MoonApiResponse, SunApiResponse, VisibilityWindowUtc } from "../api";
+import {
+  getPrimaryTimeZone,
+  localCivilDayUtcBounds,
+  utcCalendarDayBounds,
+  utcWallClockToLocal,
+} from "../locationTime";
 
 const PI = Math.PI;
 const RAD = PI / 180;
@@ -180,18 +186,21 @@ interface MoonTimes {
   always_down?: boolean;
 }
 
-function moonTimesForUtcDay(year: number, month: number, day: number, latDeg: number, lonDeg: number): MoonTimes {
-  const jd0 = jdFromUtcYmdHms(year, month, day, 0, 0, 0);
+function moonTimesInInterval(jdStart: number, jdEnd: number, latDeg: number, lonDeg: number): MoonTimes {
+  const out: MoonTimes = {};
+  if (jdEnd <= jdStart) return out;
+
+  const durationH = (jdEnd - jdStart) * 24;
+  const maxI = Math.ceil(durationH);
   const hc = 0.133 * RAD;
-  let h0 = moonPositionHorizon(jd0, latDeg, lonDeg).alt - hc;
+  let h0 = moonPositionHorizon(jdStart, latDeg, lonDeg).alt - hc;
   let rise_h: number | undefined;
   let set_h: number | undefined;
-  /** Final quadratic apex height from last iteration (matches `moon_ephemeris.cpp` ye scope). */
   let ye = 0;
 
-  for (let i = 1; i <= 24; i += 2) {
-    const h1 = moonPositionHorizon(hoursLaterJd(jd0, i), latDeg, lonDeg).alt - hc;
-    const h2 = moonPositionHorizon(hoursLaterJd(jd0, i + 1), latDeg, lonDeg).alt - hc;
+  for (let i = 1; i <= maxI; i += 2) {
+    const h1 = moonPositionHorizon(hoursLaterJd(jdStart, i), latDeg, lonDeg).alt - hc;
+    const h2 = moonPositionHorizon(hoursLaterJd(jdStart, i + 1), latDeg, lonDeg).alt - hc;
     const a = (h0 + h2) / 2 - h1;
     const b = (h2 - h0) / 2;
     const xe = Math.abs(a) < 1e-12 ? 0 : -b / (2 * a);
@@ -222,25 +231,86 @@ function moonTimesForUtcDay(year: number, month: number, day: number, latDeg: nu
     h0 = h2;
   }
 
-  const out: MoonTimes = {};
-  if (rise_h !== undefined) out.rise_jd = hoursLaterJd(jd0, rise_h);
-  if (set_h !== undefined) out.set_jd = hoursLaterJd(jd0, set_h);
-  if (rise_h === undefined && set_h === undefined) {
+  const inWindow = (jd: number) => jd >= jdStart && jd < jdEnd;
+  if (rise_h !== undefined) {
+    const riseJd = hoursLaterJd(jdStart, rise_h);
+    if (inWindow(riseJd)) out.rise_jd = riseJd;
+  }
+  if (set_h !== undefined) {
+    const setJd = hoursLaterJd(jdStart, set_h);
+    if (inWindow(setJd)) out.set_jd = setJd;
+  }
+  if (out.rise_jd === undefined && out.set_jd === undefined) {
     if (ye > 0) out.always_up = true;
     else out.always_down = true;
   }
   return out;
 }
 
-function computeFull(year: number, month: number, day: number, hourUtc: number, minuteUtc: number, latDeg: number, lonDeg: number) {
-  const jd = jdFromUtcYmdHms(year, month, day, hourUtc, minuteUtc, 0);
-  const illumination = computeIllumination(jd);
-  const phase_name = phaseNameFromPhase01(illumination.phase);
-  const times = moonTimesForUtcDay(year, month, day, latDeg, lonDeg);
-  return { jd, illumination, phase_name, times };
+function moonTimesForUtcDay(year: number, month: number, day: number, latDeg: number, lonDeg: number): MoonTimes {
+  const jd0 = jdFromUtcYmdHms(year, month, day, 0, 0, 0);
+  return moonTimesInInterval(jd0, jd0 + 1, latDeg, lonDeg);
+}
+
+function jdFromIso8601Utc(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/.exec(iso);
+  if (!m) return null;
+  return jdFromUtcYmdHms(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+}
+
+/** Mirrors App.tsx visibility window selection (local civil day when tz resolves, else UTC calendar day). */
+function resolveVisibilityWindow(
+  y: number,
+  m: number,
+  d: number,
+  hh: number,
+  mm: number,
+  lat: number,
+  lon: number,
+  preferLocalCivil: boolean,
+): { jdStart: number; jdEnd: number } | null {
+  const dateUtc = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const timeUtc = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  const tz = getPrimaryTimeZone(lat, lon);
+  let bounds = utcCalendarDayBounds(dateUtc);
+  if (preferLocalCivil && tz) {
+    const local = utcWallClockToLocal(dateUtc, timeUtc, tz);
+    if (local) {
+      const civil = localCivilDayUtcBounds(local.dateLocal, tz);
+      if (civil) bounds = civil;
+    }
+  }
+  if (!bounds) return null;
+  const jdStart = jdFromIso8601Utc(bounds.visStartUtc);
+  const jdEnd = jdFromIso8601Utc(bounds.visEndUtc);
+  if (jdStart === null || jdEnd === null) return null;
+  return { jdStart, jdEnd };
 }
 
 /** Builds responses matching `moon_api.cpp` `build_json` / `build_sun_json`. */
+function moonTimesForRequest(
+  y: number,
+  m: number,
+  d: number,
+  hh: number,
+  mm: number,
+  lat: number,
+  lon: number,
+  options?: { preferLocalCivil?: boolean; visibilityWindow?: VisibilityWindowUtc },
+): MoonTimes {
+  if (options?.visibilityWindow) {
+    const jdStart = jdFromIso8601Utc(options.visibilityWindow.visStartUtc);
+    const jdEnd = jdFromIso8601Utc(options.visibilityWindow.visEndUtc);
+    if (jdStart !== null && jdEnd !== null) {
+      return moonTimesInInterval(jdStart, jdEnd, lat, lon);
+    }
+  }
+  const window = resolveVisibilityWindow(y, m, d, hh, mm, lat, lon, options?.preferLocalCivil ?? true);
+  return window
+    ? moonTimesInInterval(window.jdStart, window.jdEnd, lat, lon)
+    : moonTimesForUtcDay(y, m, d, lat, lon);
+}
+
 export function buildMoonSunGoldenResponses(
   y: number,
   m: number,
@@ -249,8 +319,13 @@ export function buildMoonSunGoldenResponses(
   mm: number,
   lat: number,
   lon: number,
+  options?: { preferLocalCivil?: boolean; visibilityWindow?: VisibilityWindowUtc },
 ): { moon: MoonApiResponse; sun: SunApiResponse } {
-  const r = computeFull(y, m, d, hh, mm, lat, lon);
+  const jd = jdFromUtcYmdHms(y, m, d, hh, mm, 0);
+  const illumination = computeIllumination(jd);
+  const phase_name = phaseNameFromPhase01(illumination.phase);
+  const times = moonTimesForRequest(y, m, d, hh, mm, lat, lon, options);
+  const r = { jd, illumination, phase_name, times };
   const instantUtc = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00Z`;
 
   const moon: MoonApiResponse = {

@@ -5,7 +5,9 @@ import {
   formatInstantForDisplay,
   formatUtcIsoInZone,
   getPrimaryTimeZone,
+  localCivilDayUtcBounds,
   localWallClockToUtc,
+  utcCalendarDayBounds,
   utcWallClockToLocal,
 } from "./locationTime";
 
@@ -68,6 +70,23 @@ describe("localWallClockToUtc / utcWallClockToLocal", () => {
   it("rolls the UTC calendar date when local evening crosses midnight UTC", () => {
     const utc = localWallClockToUtc("2024-06-15", "22:00", "America/Los_Angeles");
     expect(utc).toEqual({ dateUtc: "2024-06-16", timeUtc: "05:00" });
+  });
+});
+
+describe("localCivilDayUtcBounds / utcCalendarDayBounds", () => {
+  it("uses PDT midnight boundaries for a Seattle civil day in summer", () => {
+    const bounds = localCivilDayUtcBounds("2024-06-15", "America/Los_Angeles");
+    expect(bounds).toEqual({
+      visStartUtc: "2024-06-15T07:00:00Z",
+      visEndUtc: "2024-06-16T07:00:00Z",
+    });
+  });
+
+  it("uses UTC midnight boundaries for a UTC calendar day", () => {
+    expect(utcCalendarDayBounds("2024-06-15")).toEqual({
+      visStartUtc: "2024-06-15T00:00:00Z",
+      visEndUtc: "2024-06-16T00:00:00Z",
+    });
   });
 });
 

@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  # Vitest (*.test.tsx / *.test.ts per vite.config) + ESLint + Playwright E2E (real moon-api on 8080).
+  # Vitest (*.test.tsx / *.test.ts per vite.config) + ESLint + functional Playwright E2E (a11y in specialized-testing.yml).
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -49,10 +49,10 @@ jobs:
       - run: npm test -- --reporter=verbose
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
-      - name: Playwright E2E
+      - name: Playwright E2E (functional)
         env:
           CI: true
-        run: npm run test:e2e
+        run: npm run test:e2e:ci
 
   backend:
     runs-on: ubuntu-latest

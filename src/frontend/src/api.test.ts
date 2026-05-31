@@ -57,6 +57,26 @@ describe("fetchMoon", () => {
     expect(url).toContain("time=12%3A00");
   });
 
+  it("includes visibility window query params when provided", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue(jsonResponse(validMoonBody));
+
+    await fetchMoon({
+      lat: 47.6,
+      lon: -122.33,
+      date: "2024-06-15",
+      timeUtc: "12:00",
+      visibilityWindow: {
+        visStartUtc: "2024-06-15T07:00:00Z",
+        visEndUtc: "2024-06-16T07:00:00Z",
+      },
+    });
+
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain("vis_start_utc=2024-06-15T07%3A00%3A00Z");
+    expect(url).toContain("vis_end_utc=2024-06-16T07%3A00%3A00Z");
+  });
+
   it("returns parsed JSON on 200", async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(validMoonBody));
 
